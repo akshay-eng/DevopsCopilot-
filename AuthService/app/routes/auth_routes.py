@@ -7,6 +7,7 @@ from flask_jwt_extended import (
 )
 from app.models.user_model import User
 from app.utils.validators import validate_email, validate_password, validate_username
+from app.utils.email_service import send_verification_email
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -55,12 +56,15 @@ def register():
         # Create user
         user = User.create_user(email, username, password)
 
+        # Send verification email
+        send_verification_email(user.email, user.username)
+
         # Generate tokens
         access_token = create_access_token(identity=str(user._id))
         refresh_token = create_refresh_token(identity=str(user._id))
 
         return jsonify({
-            "message": "User registered successfully",
+            "message": "User registered successfully. Please check your email to verify your account.",
             "user": user.to_dict(),
             "access_token": access_token,
             "refresh_token": refresh_token

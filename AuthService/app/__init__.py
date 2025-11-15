@@ -34,8 +34,10 @@ def create_app(config_name='default'):
     # Register blueprints
     from app.routes.auth_routes import auth_bp
     from app.routes.oauth_routes import oauth_bp
+    from app.routes.email_routes import email_bp
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(oauth_bp, url_prefix='/api/oauth')
+    app.register_blueprint(email_bp, url_prefix='/api/email')
 
     # Health check endpoint
     @app.route('/')

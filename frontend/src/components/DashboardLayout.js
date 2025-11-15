@@ -74,7 +74,7 @@ const DashboardLayout = () => {
         {/* Upgrade Banner */}
         {!sidebarCollapsed && (
           <div className={`p-4 ${theme === 'dark' ? 'border-slate-800' : 'border-gray-200'} border-b`}>
-            <button className="w-full py-2 px-4 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg text-white text-sm font-medium hover:from-emerald-600 hover:to-teal-700 transition-all flex items-center justify-center space-x-2">
+            <button className="w-full py-2 px-4 bg-gradient-to-r from-purple-500 to-violet-600 rounded-lg text-white text-sm font-medium hover:from-purple-600 hover:to-violet-700 transition-all flex items-center justify-center space-x-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
               </svg>
@@ -87,7 +87,12 @@ const DashboardLayout = () => {
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           <div className="mb-6">
             <button
-              className={`w-full py-2 px-3 text-left text-sm ${theme === 'dark' ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'} rounded transition-colors flex items-center ${sidebarCollapsed ? 'justify-center' : 'space-x-3'}`}
+              onClick={() => navigate('/dashboard/holmesgpt')}
+              className={`w-full py-2 px-3 text-left text-sm ${
+                isActive('/dashboard/holmesgpt')
+                  ? 'bg-gradient-to-r from-purple-500 to-violet-600 text-white'
+                  : theme === 'dark' ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              } rounded transition-colors flex items-center ${sidebarCollapsed ? 'justify-center' : 'space-x-3'}`}
               title={sidebarCollapsed ? 'Ask HolmesGPT' : ''}
             >
               <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,13 +115,29 @@ const DashboardLayout = () => {
             >
               {sidebarCollapsed ? '⏱' : 'Timeline'}
             </button>
-            <button className={`w-full py-2 px-3 text-left text-sm ${theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'} rounded transition-colors ${sidebarCollapsed ? 'flex justify-center' : ''}`} title={sidebarCollapsed ? 'Trends' : ''}>
+            <button
+              onClick={() => navigate('/dashboard/trends')}
+              className={`w-full py-2 px-3 text-left text-sm ${
+                isActive('/dashboard/trends')
+                  ? theme === 'dark' ? 'text-white bg-violet-600/20 border-l-2 border-violet-500' : 'text-gray-900 bg-blue-50 border-l-2 border-blue-500'
+                  : theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
+              } rounded transition-colors ${sidebarCollapsed ? 'flex justify-center' : ''}`}
+              title={sidebarCollapsed ? 'Trends' : ''}
+            >
               {sidebarCollapsed ? '📈' : 'Trends'}
             </button>
             <button className={`w-full py-2 px-3 text-left text-sm ${theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'} rounded transition-colors ${sidebarCollapsed ? 'flex justify-center' : ''}`} title={sidebarCollapsed ? 'Report' : ''}>
               {sidebarCollapsed ? '📊' : 'Report'}
             </button>
-            <button className={`w-full py-2 px-3 text-left text-sm ${theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'} rounded transition-colors ${sidebarCollapsed ? 'flex justify-center' : ''}`} title={sidebarCollapsed ? 'Managed Alerts' : ''}>
+            <button
+              onClick={() => navigate('/dashboard/managed-alerts')}
+              className={`w-full py-2 px-3 text-left text-sm ${
+                isActive('/dashboard/managed-alerts')
+                  ? theme === 'dark' ? 'text-white bg-violet-600/20 border-l-2 border-violet-500' : 'text-gray-900 bg-blue-50 border-l-2 border-blue-500'
+                  : theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
+              } rounded transition-colors ${sidebarCollapsed ? 'flex justify-center' : ''}`}
+              title={sidebarCollapsed ? 'Managed Alerts' : ''}
+            >
               {sidebarCollapsed ? '🔔' : 'Managed Alerts'}
             </button>
             <button className={`w-full py-2 px-3 text-left text-sm ${theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'} rounded transition-colors ${sidebarCollapsed ? 'flex justify-center' : ''}`} title={sidebarCollapsed ? 'Silences' : ''}>
@@ -147,8 +168,27 @@ const DashboardLayout = () => {
             <button className={`w-full py-2 px-3 text-left text-sm ${theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'} rounded transition-colors ${sidebarCollapsed ? 'flex justify-center' : ''}`} title={sidebarCollapsed ? 'Jobs' : ''}>
               {sidebarCollapsed ? '⚙️' : 'Jobs'}
             </button>
-            <button className={`w-full py-2 px-3 text-left text-sm ${theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'} rounded transition-colors ${sidebarCollapsed ? 'flex justify-center' : ''}`} title={sidebarCollapsed ? 'Nodes' : ''}>
+            <button
+              onClick={() => navigate('/dashboard/nodes')}
+              className={`w-full py-2 px-3 text-left text-sm ${
+                isActive('/dashboard/nodes')
+                  ? theme === 'dark' ? 'text-white bg-violet-600/20 border-l-2 border-violet-500' : 'text-gray-900 bg-blue-50 border-l-2 border-blue-500'
+                  : theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
+              } rounded transition-colors ${sidebarCollapsed ? 'flex justify-center' : ''}`}
+              title={sidebarCollapsed ? 'Nodes' : ''}
+            >
               {sidebarCollapsed ? '🖥' : 'Nodes'}
+            </button>
+            <button
+              onClick={() => navigate('/dashboard/service-dependency')}
+              className={`w-full py-2 px-3 text-left text-sm ${
+                isActive('/dashboard/service-dependency')
+                  ? theme === 'dark' ? 'text-white bg-violet-600/20 border-l-2 border-violet-500' : 'text-gray-900 bg-blue-50 border-l-2 border-blue-500'
+                  : theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
+              } rounded transition-colors ${sidebarCollapsed ? 'flex justify-center' : ''}`}
+              title={sidebarCollapsed ? 'Service Dependency' : ''}
+            >
+              {sidebarCollapsed ? '🔗' : 'Service Dependency'}
             </button>
             <button className={`w-full py-2 px-3 text-left text-sm ${theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'} rounded transition-colors ${sidebarCollapsed ? 'flex justify-center' : ''}`} title={sidebarCollapsed ? 'Custom Resources' : ''}>
               {sidebarCollapsed ? '📦' : 'Custom Resources'}
@@ -164,7 +204,15 @@ const DashboardLayout = () => {
             <button className={`w-full py-2 px-3 text-left text-sm ${theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'} rounded transition-colors ${sidebarCollapsed ? 'flex justify-center' : ''}`} title={sidebarCollapsed ? 'Metrics Explorer' : ''}>
               {sidebarCollapsed ? '📊' : 'Metrics Explorer'}
             </button>
-            <button className={`w-full py-2 px-3 text-left text-sm ${theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'} rounded transition-colors ${sidebarCollapsed ? 'flex justify-center' : ''}`} title={sidebarCollapsed ? 'Comparison' : ''}>
+            <button
+              onClick={() => navigate('/dashboard/comparison')}
+              className={`w-full py-2 px-3 text-left text-sm ${
+                isActive('/dashboard/comparison')
+                  ? theme === 'dark' ? 'text-white bg-violet-600/20 border-l-2 border-violet-500' : 'text-gray-900 bg-blue-50 border-l-2 border-blue-500'
+                  : theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
+              } rounded transition-colors ${sidebarCollapsed ? 'flex justify-center' : ''}`}
+              title={sidebarCollapsed ? 'Comparison' : ''}
+            >
               {sidebarCollapsed ? '⚖' : 'Comparison'}
             </button>
           </div>
@@ -189,7 +237,7 @@ const DashboardLayout = () => {
         <div className={`p-4 ${theme === 'dark' ? 'border-slate-800' : 'border-gray-200'} border-t`}>
           {!sidebarCollapsed && (
             <div className="flex items-center justify-between text-sm mb-3">
-              <button className="px-3 py-2 bg-emerald-500/10 text-emerald-400 rounded text-xs font-medium flex items-center space-x-2">
+              <button className="px-3 py-2 bg-purple-500/10 text-purple-400 rounded text-xs font-medium flex items-center space-x-2">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>

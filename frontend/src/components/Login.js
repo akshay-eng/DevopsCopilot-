@@ -174,9 +174,13 @@ const Login = () => {
                 />
                 <span className="text-sm text-gray-300">Remember me</span>
               </label>
-              <a href="#" className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors">
+              <button
+                type="button"
+                onClick={() => navigate('/forgot-password')}
+                className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+              >
                 Forgot password?
-              </a>
+              </button>
             </div>
 
             {/* Submit Button */}

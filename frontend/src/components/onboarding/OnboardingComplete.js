@@ -24,7 +24,7 @@ const OnboardingComplete = ({ data }) => {
       <div className="max-w-2xl w-full">
         {/* Success Animation */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-32 h-32 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full mb-6 animate-bounce shadow-2xl">
+          <div className="inline-flex items-center justify-center w-32 h-32 bg-gradient-to-br from-purple-400 to-violet-500 rounded-full mb-6 animate-bounce shadow-2xl">
             <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
@@ -58,10 +58,10 @@ const OnboardingComplete = ({ data }) => {
                   Type: <span className="font-medium text-slate-800">{data.clusterType?.toUpperCase() || 'Not specified'}</span>
                 </p>
                 <div className="flex items-center space-x-4 mt-2 text-sm">
-                  <span className={`flex items-center ${data.hasPrometheus ? 'text-green-600' : 'text-slate-400'}`}>
+                  <span className={`flex items-center ${data.hasPrometheus ? 'text-purple-600' : 'text-slate-400'}`}>
                     {data.hasPrometheus ? '✓' : '○'} Prometheus
                   </span>
-                  <span className={`flex items-center ${data.hasGrafana ? 'text-green-600' : 'text-slate-400'}`}>
+                  <span className={`flex items-center ${data.hasGrafana ? 'text-purple-600' : 'text-slate-400'}`}>
                     {data.hasGrafana ? '✓' : '○'} Grafana
                   </span>
                 </div>
@@ -69,14 +69,14 @@ const OnboardingComplete = ({ data }) => {
             </div>
 
             <div className="flex items-start space-x-4 pb-4 border-b border-slate-200">
-              <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-slate-800 mb-1">Installation Status</h3>
-                <p className="text-sm text-green-600 font-medium">Completed Successfully</p>
+                <p className="text-sm text-purple-600 font-medium">Completed Successfully</p>
               </div>
             </div>
 
@@ -88,8 +88,8 @@ const OnboardingComplete = ({ data }) => {
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-slate-800 mb-1">Connection Status</h3>
-                <p className="text-sm text-green-600 font-medium flex items-center">
-                  <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+                <p className="text-sm text-purple-600 font-medium flex items-center">
+                  <span className="w-2 h-2 bg-purple-500 rounded-full mr-2 animate-pulse"></span>
                   Connected & Monitoring
                 </p>
               </div>

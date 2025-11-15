@@ -359,7 +359,7 @@ const Timeline = () => {
                   </td>
                   <td className={`px-6 py-4 text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}`}>{event.cluster}</td>
                   <td className="px-6 py-4">
-                    <button className={`${theme === 'dark' ? 'text-emerald-400 hover:text-emerald-300' : 'text-green-600 hover:text-green-700'} text-sm font-medium`}>
+                    <button className={`${theme === 'dark' ? 'text-purple-400 hover:text-purple-300' : 'text-purple-600 hover:text-purple-700'} text-sm font-medium`}>
                       View {event.events} events
                     </button>
                   </td>
