@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../hooks/useAuth';
 import SettingsPanel from './SettingsPanel';
+import FloatingChat from './FloatingChat';
 
 const DashboardLayout = () => {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ const DashboardLayout = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showFloatingChat, setShowFloatingChat] = useState(false);
 
   const isActive = (path) => location.pathname === path;
 
@@ -331,6 +333,20 @@ const DashboardLayout = () => {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Bar */}
         <div className={`${theme === 'dark' ? 'bg-[#13131f] border-slate-800' : 'bg-white border-gray-200'} border-b px-6 py-4 flex items-center justify-end space-x-3`}>
+          {/* HolmesGPT Chat Button */}
+          <button
+            onClick={() => setShowFloatingChat(true)}
+            className={`p-2 relative rounded-lg transition-colors ${
+              theme === 'dark' ? 'hover:bg-slate-800 bg-purple-500/10' : 'hover:bg-gray-100 bg-purple-50'
+            }`}
+            title="Ask HolmesGPT"
+          >
+            <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-purple-500 rounded-full animate-pulse"></div>
+          </button>
+
           <button className={`p-2 ${theme === 'dark' ? 'hover:bg-slate-800' : 'hover:bg-gray-100'} rounded transition-colors`}>
             <svg className={`w-5 h-5 ${theme === 'dark' ? 'text-slate-400' : 'text-gray-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -363,6 +379,9 @@ const DashboardLayout = () => {
 
       {/* Settings Panel */}
       <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} />
+
+      {/* Floating Chat */}
+      <FloatingChat isOpen={showFloatingChat} onClose={() => setShowFloatingChat(false)} />
     </div>
   );
 };
