@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
+import { useDispatch } from 'react-redux';
+import { saveOnboardingProgress } from '../../redux/slices/onboardingSlice';
 
 const ClusterSetup = ({ data, updateData, nextStep }) => {
+  const dispatch = useDispatch();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
+    clusterName: data.clusterName || 'production-cluster',
     clusterType: data.clusterType || '',
     hasPrometheus: data.hasPrometheus || false,
     hasGrafana: data.hasGrafana || false
@@ -50,14 +56,46 @@ const ClusterSetup = ({ data, updateData, nextStep }) => {
     }
   ];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.clusterType) {
-      alert('Please select a cluster type');
+
+    if (!formData.clusterName.trim()) {
+      setError('Please enter a cluster name');
       return;
     }
-    updateData(formData);
-    nextStep();
+
+    if (!formData.clusterType) {
+      setError('Please select a cluster type');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Save cluster setup data to backend via Redux
+      const result = await dispatch(saveOnboardingProgress({
+        clusterName: formData.clusterName,
+        clusterType: formData.clusterType,
+        hasPrometheus: formData.hasPrometheus,
+        hasGrafana: formData.hasGrafana
+      }));
+
+      if (result.type === 'onboarding/saveProgress/fulfilled') {
+        // Update local state
+        updateData(formData);
+        // Move to next step
+        nextStep();
+      } else {
+        throw new Error(result.payload || 'Failed to save cluster setup');
+      }
+
+    } catch (err) {
+      console.error('Cluster setup error:', err);
+      setError(err.message || 'Failed to save cluster setup. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClusterSelect = (clusterId) => {
@@ -80,6 +118,38 @@ const ClusterSetup = ({ data, updateData, nextStep }) => {
       {/* Content - Scrollable */}
       <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
         <div className="p-8 overflow-y-auto flex-1">
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+              <div className="flex space-x-3">
+                <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="text-sm text-red-300">
+                  {error}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Cluster Name Input */}
+          <div className="mb-8">
+            <label className="block text-sm font-semibold text-slate-300 mb-4">
+              Cluster Name
+            </label>
+            <input
+              type="text"
+              value={formData.clusterName}
+              onChange={(e) => setFormData(prev => ({ ...prev, clusterName: e.target.value }))}
+              placeholder="e.g., production-cluster, staging-cluster"
+              className="w-full px-4 py-3 bg-[#1a1a2e] border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              disabled={loading}
+            />
+            <p className="mt-2 text-sm text-slate-500">
+              Choose a descriptive name for your cluster
+            </p>
+          </div>
+
           {/* Cluster Type Selection */}
           <div className="mb-8">
             <label className="block text-sm font-semibold text-slate-300 mb-4">
@@ -205,12 +275,22 @@ const ClusterSetup = ({ data, updateData, nextStep }) => {
           </button>
           <button
             type="submit"
-            className="px-8 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-lg hover:from-violet-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg font-semibold flex items-center space-x-2"
+            disabled={loading}
+            className="px-8 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-lg hover:from-violet-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg font-semibold flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <span>Continue</span>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-            </svg>
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                <span>Registering Cluster...</span>
+              </>
+            ) : (
+              <>
+                <span>Continue</span>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </>
+            )}
           </button>
         </div>
       </form>

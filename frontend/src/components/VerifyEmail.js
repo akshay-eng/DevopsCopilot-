@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { api } from '../services/api';
+import { useDispatch } from 'react-redux';
+import { verifyEmail as verifyEmailAction } from '../redux/slices/authSlice';
 
 const VerifyEmail = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [status, setStatus] = useState('verifying'); // verifying, success, error
   const [message, setMessage] = useState('');
+  const verifiedRef = React.useRef(false); // Prevent double verification
 
   useEffect(() => {
-    const verifyEmail = async () => {
+    const verify = async () => {
       const token = searchParams.get('token');
 
       if (!token) {
@@ -18,23 +21,55 @@ const VerifyEmail = () => {
         return;
       }
 
-      try {
-        const response = await api.post('/api/email/verify-email', { token });
-        setStatus('success');
-        setMessage(response.message || 'Email verified successfully!');
+      // Prevent double verification in React Strict Mode
+      if (verifiedRef.current) {
+        console.log('Verification already attempted, skipping...');
+        return;
+      }
+      verifiedRef.current = true;
 
-        // Redirect to dashboard after 3 seconds
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 3000);
+      try {
+        console.log('=== EMAIL VERIFICATION DEBUG ===');
+        console.log('Verifying token:', token);
+        console.log('Token length:', token?.length);
+
+        const result = await dispatch(verifyEmailAction(token));
+
+        console.log('Full verification result:', JSON.stringify(result, null, 2));
+        console.log('Result type:', result.type);
+        console.log('Result payload:', result.payload);
+        console.log('Result meta:', result.meta);
+
+        if (result.type === 'auth/verifyEmail/fulfilled') {
+          console.log('✅ Verification successful - payload:', result.payload);
+          setStatus('success');
+          setMessage(result.payload?.message || 'Email verified successfully!');
+
+          // Redirect to onboarding after 3 seconds
+          setTimeout(() => {
+            navigate('/onboarding');
+          }, 3000);
+        } else if (result.type === 'auth/verifyEmail/rejected') {
+          console.log('❌ Verification rejected');
+          console.log('Error payload:', result.payload);
+          console.log('Error:', result.error);
+          setStatus('error');
+          setMessage(result.payload || 'Email verification failed. The link may have expired.');
+        } else {
+          console.log('⚠️ Unexpected result type:', result.type);
+          setStatus('error');
+          setMessage('Email verification failed. The link may have expired.');
+        }
       } catch (error) {
+        console.error('Verification exception caught:', error);
+        console.error('Error details:', error.message, error.stack);
         setStatus('error');
-        setMessage(error.response?.data?.error || 'Email verification failed. The link may have expired.');
+        setMessage('An unexpected error occurred during verification.');
       }
     };
 
-    verifyEmail();
-  }, [searchParams, navigate]);
+    verify();
+  }, [searchParams, navigate, dispatch]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-purple-700 flex items-center justify-center p-4">
@@ -60,7 +95,7 @@ const VerifyEmail = () => {
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Email Verified!</h2>
             <p className="text-gray-600 mb-4">{message}</p>
-            <p className="text-sm text-gray-500">Redirecting to dashboard...</p>
+            <p className="text-sm text-gray-500">Redirecting to onboarding...</p>
           </>
         )}
 

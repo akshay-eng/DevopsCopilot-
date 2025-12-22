@@ -41,7 +41,7 @@ Your React frontend has been successfully integrated with the Flask authenticati
 
 2. **Environment variables:**
    ```env
-   REACT_APP_API_URL=http://localhost:8000
+   REACT_APP_API_URL=http://localhost:5001
    REACT_APP_FRONTEND_URL=http://localhost:3000
    ```
 
@@ -61,7 +61,7 @@ Your React frontend has been successfully integrated with the Flask authenticati
    python server.py
    ```
 
-   Backend will run on: http://localhost:8000
+   Backend will run on: http://localhost:5001
 
 ### Frontend (React App)
 

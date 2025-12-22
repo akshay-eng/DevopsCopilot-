@@ -1,10 +1,32 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const OnboardingComplete = ({ data }) => {
   const navigate = useNavigate();
+  const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
+    // Mark onboarding as complete
+    const completeOnboarding = async () => {
+      try {
+        const token = localStorage.getItem('access_token');
+        if (token) {
+          const authServiceUrl = process.env.REACT_APP_AUTH_SERVICE_URL || 'http://localhost:5001';
+          await fetch(`${authServiceUrl}/api/auth/complete-onboarding`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Failed to mark onboarding as complete:', error);
+      }
+    };
+
+    completeOnboarding();
+
     // Auto-redirect to dashboard after 5 seconds
     const timer = setTimeout(() => {
       navigate('/dashboard');
@@ -14,7 +36,23 @@ const OnboardingComplete = ({ data }) => {
     return () => clearTimeout(timer);
   }, [data, navigate]);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    setCompleting(true);
+    try {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        const authServiceUrl = process.env.REACT_APP_AUTH_SERVICE_URL || 'http://localhost:5001';
+        await fetch(`${authServiceUrl}/api/auth/complete-onboarding`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Failed to mark onboarding as complete:', error);
+    }
     navigate('/dashboard');
     console.log('Manual navigation to dashboard with data:', data);
   };

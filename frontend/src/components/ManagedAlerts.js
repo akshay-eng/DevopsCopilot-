@@ -1,625 +1,436 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import { getClusters, getNamespaces } from '../services/api';
+import { alertCatalog, alertCategories, severityLevels } from '../config/alertCatalog';
+import { backendApi } from '../services/api';
 
 const ManagedAlerts = () => {
   const { theme } = useTheme();
-  const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const [showNewAlertModal, setShowNewAlertModal] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedAlert, setSelectedAlert] = useState(null);
+  const [showCreatePanel, setShowCreatePanel] = useState(false);
+  const [clusters, setClusters] = useState([]);
+  const [selectedCluster, setSelectedCluster] = useState(null);
+  const [namespaces, setNamespaces] = useState([]);
+  const [formData, setFormData] = useState({
+    cluster: '',
+    namespace: 'all',
+    severity: 'warning',
+    variables: {}
+  });
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
 
-  // Recommended alert templates
-  const recommendedAlerts = [
-    {
-      id: 1,
-      name: 'KubeJobFailed',
-      description: 'Job failed to complete.',
-      category: 'Application Health',
-      badge: 'Recommended'
-    },
-    {
-      id: 2,
-      name: 'KubePersistentVolumeFillingUp',
-      description: 'PersistentVolume is filling up.',
-      severity: 'critical',
-      category: 'Storage',
-      badge: 'Recommended'
-    },
-    {
-      id: 3,
-      name: 'KubePodCrashLooping',
-      description: 'Pod is crash looping.',
-      category: 'Application Health',
-      badge: 'Recommended'
-    },
-    {
-      id: 4,
-      name: 'KubePodNotReady',
-      description: 'Pod has been in a non-ready state for more than 15 minutes.',
-      category: 'Application Health',
-      badge: 'Recommended'
+  // Fetch clusters on mount
+  useEffect(() => {
+    const fetchClusters = async () => {
+      try {
+        const clustersData = await getClusters();
+        setClusters(clustersData.clusters || []);
+
+        if (clustersData.clusters && clustersData.clusters.length > 0) {
+          setSelectedCluster(clustersData.clusters[0]);
+          setFormData(prev => ({ ...prev, cluster: clustersData.clusters[0].id }));
+        }
+      } catch (err) {
+        console.error('Failed to fetch clusters:', err);
+      }
+    };
+
+    fetchClusters();
+  }, []);
+
+  // Fetch namespaces when cluster changes
+  useEffect(() => {
+    if (!selectedCluster) return;
+
+    const fetchNamespacesData = async () => {
+      try {
+        const namespacesData = await getNamespaces(selectedCluster.id);
+        const namespaceNames = namespacesData.items?.map(ns => ns.name) || [];
+        setNamespaces(['all', ...namespaceNames]);
+      } catch (err) {
+        console.error('Failed to fetch namespaces:', err);
+      }
+    };
+
+    fetchNamespacesData();
+  }, [selectedCluster]);
+
+  const filteredAlerts = selectedCategory === 'all'
+    ? alertCatalog
+    : alertCatalog.filter(alert => alert.category === selectedCategory);
+
+  const handleAlertSelect = (alert) => {
+    setSelectedAlert(alert);
+    setShowCreatePanel(true);
+    setError(null);
+    setSuccess(null);
+
+    // Initialize variables with defaults
+    const variables = {};
+    alert.variables.forEach(variable => {
+      variables[variable.name] = variable.default;
+    });
+
+    setFormData(prev => ({
+      ...prev,
+      severity: alert.severity,
+      variables
+    }));
+  };
+
+  const handleClusterChange = (clusterId) => {
+    const cluster = clusters.find(c => c.id === clusterId);
+    setSelectedCluster(cluster);
+    setFormData(prev => ({ ...prev, cluster: clusterId, namespace: 'all' }));
+  };
+
+  const handleVariableChange = (varName, value) => {
+    setFormData(prev => ({
+      ...prev,
+      variables: {
+        ...prev.variables,
+        [varName]: value
+      }
+    }));
+  };
+
+  const handleCreateAlert = async () => {
+    if (!selectedAlert || !selectedCluster) return;
+
+    setCreating(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      // Generate the PromQL expression
+      const expr = selectedAlert.promql(formData.variables, selectedCluster.name, formData.namespace);
+      const annotations = selectedAlert.annotations(formData.variables);
+
+      // Get duration from variables (default to 5m if not present)
+      const duration = formData.variables.duration || 5;
+
+      // Create alert payload
+      const alertPayload = {
+        cluster_id: selectedCluster.id,
+        alert_name: `${selectedAlert.id}_${Date.now()}`,
+        alert_group: selectedAlert.category,
+        expr: expr,
+        duration: `${duration}m`,
+        severity: formData.severity,
+        summary: annotations.summary,
+        description: annotations.description,
+        labels: {
+          alert_template: selectedAlert.id,
+          cluster: selectedCluster.name,
+          namespace: formData.namespace
+        }
+      };
+
+      // Send to backend
+      const response = await backendApi.post('/api/alerts/create', alertPayload);
+
+      setSuccess('Alert created successfully in Prometheus!');
+
+      // Reset form after 2 seconds
+      setTimeout(() => {
+        setShowCreatePanel(false);
+        setSelectedAlert(null);
+        setSuccess(null);
+      }, 2000);
+
+    } catch (err) {
+      console.error('Failed to create alert:', err);
+      setError(err.message || 'Failed to create alert');
+    } finally {
+      setCreating(false);
     }
-  ];
+  };
 
-  const handleSelectTemplate = (template) => {
-    setSelectedTemplate(template);
-    setShowNewAlertModal(true);
+  const getSeverityColor = (severity) => {
+    switch (severity) {
+      case 'critical': return theme === 'dark' ? 'text-red-400 bg-red-900/20' : 'text-red-600 bg-red-100';
+      case 'warning': return theme === 'dark' ? 'text-yellow-400 bg-yellow-900/20' : 'text-yellow-600 bg-yellow-100';
+      case 'info': return theme === 'dark' ? 'text-blue-400 bg-blue-900/20' : 'text-blue-600 bg-blue-100';
+      default: return theme === 'dark' ? 'text-slate-400 bg-slate-900/20' : 'text-gray-600 bg-gray-100';
+    }
   };
 
   return (
-    <div className={`flex-1 overflow-auto ${theme === 'dark' ? 'bg-[#0a0a0f]' : 'bg-gray-50'}`}>
-      {/* Info Banner */}
-      <div className={`sticky top-0 z-10 ${theme === 'dark' ? 'bg-[#0a0a0f] border-slate-800' : 'bg-white border-gray-200'} border-b px-6 py-4`}>
-        <div className={`${theme === 'dark' ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'} border rounded-lg px-4 py-3 flex items-start justify-between`}>
-          <div className="flex items-start space-x-3">
-            <svg className="w-5 h-5 text-blue-500 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-            </svg>
+    <div className={`flex-1 flex flex-col ${theme === 'dark' ? 'bg-[#0a0a0f]' : 'bg-gray-50'}`}>
+      {/* Header */}
+      <header className={`${theme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-200'} border-b sticky top-0 z-10`}>
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
             <div>
-              <p className={`text-sm ${theme === 'dark' ? 'text-blue-300' : 'text-blue-800'}`}>
-                Tip: You can now create log-based alerts.{' '}
-                <a href="#" className="text-blue-500 hover:text-blue-600 underline">
-                  Learn More
-                </a>
+              <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                Managed Alerts
+              </h1>
+              <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-gray-600'}`}>
+                Create Prometheus alerts from predefined templates
               </p>
             </div>
           </div>
-          <button className={`${theme === 'dark' ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+        </div>
+      </header>
+
+      {/* Category Filter */}
+      <div className={`px-6 py-4 ${theme === 'dark' ? 'bg-slate-900/50' : 'bg-gray-100'}`}>
+        <div className="flex items-center space-x-2 overflow-x-auto">
+          {alertCategories.map(category => (
+            <button
+              key={category.id}
+              onClick={() => setSelectedCategory(category.id)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                selectedCategory === category.id
+                  ? theme === 'dark'
+                    ? 'bg-violet-600 text-white'
+                    : 'bg-blue-600 text-white'
+                  : theme === 'dark'
+                  ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <span className="mr-2">{category.icon}</span>
+              {category.name}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="p-6">
-        {/* Empty State */}
-        <div className="flex flex-col items-center justify-center py-16">
-          <div className="mb-8">
-            <svg className="w-64 h-64" viewBox="0 0 400 300" fill="none">
-              {/* Illustration of person with computer */}
-              <rect x="80" y="120" width="180" height="120" rx="8" fill={theme === 'dark' ? '#1e293b' : '#e2e8f0'} />
-              <rect x="90" y="130" width="160" height="90" rx="4" fill={theme === 'dark' ? '#0f172a' : '#f8fafc'} />
-              <line x1="100" y1="145" x2="140" y2="145" stroke={theme === 'dark' ? '#3b82f6' : '#60a5fa'} strokeWidth="3" />
-              <line x1="100" y1="160" x2="180" y2="160" stroke={theme === 'dark' ? '#3b82f6' : '#60a5fa'} strokeWidth="3" />
-              <line x1="100" y1="175" x2="160" y2="175" stroke={theme === 'dark' ? '#3b82f6' : '#60a5fa'} strokeWidth="3" />
-
-              {/* Chart icon */}
-              <polyline points="200,170 215,160 230,165 245,150" stroke={theme === 'dark' ? '#10b981' : '#34d399'} strokeWidth="2" fill="none" />
-              <circle cx="200" cy="170" r="3" fill={theme === 'dark' ? '#10b981' : '#34d399'} />
-              <circle cx="215" cy="160" r="3" fill={theme === 'dark' ? '#10b981' : '#34d399'} />
-              <circle cx="230" cy="165" r="3" fill={theme === 'dark' ? '#10b981' : '#34d399'} />
-              <circle cx="245" cy="150" r="3" fill={theme === 'dark' ? '#10b981' : '#34d399'} />
-
-              {/* Person */}
-              <circle cx="320" cy="140" r="20" fill={theme === 'dark' ? '#818cf8' : '#a5b4fc'} />
-              <path d="M 300 180 Q 320 165 340 180 L 340 220 Q 340 230 330 230 L 310 230 Q 300 230 300 220 Z" fill={theme === 'dark' ? '#34d399' : '#6ee7b7'} />
-              <rect x="295" y="180" width="15" height="50" rx="7" fill={theme === 'dark' ? '#fbbf24' : '#fcd34d'} />
-              <rect x="330" y="180" width="15" height="50" rx="7" fill={theme === 'dark' ? '#fbbf24' : '#fcd34d'} />
-            </svg>
-          </div>
-
-          <h2 className={`text-2xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-            Monitor your namespaces with Prometheus Alerts
-          </h2>
-
-          <button
-            onClick={() => setShowTemplateModal(true)}
-            className="mt-6 px-6 py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-semibold flex items-center space-x-2 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            <span>New From Template</span>
-          </button>
-        </div>
-
-        {/* Recommended Alerts Section */}
-        <div className="mt-12">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-2">
-              <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-              <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                Recommended Alerts
-              </h3>
-              <button className={`p-1 ${theme === 'dark' ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'} rounded`}>
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-              </button>
+      {/* Alert Catalog Grid */}
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredAlerts.map(alert => (
+            <div
+              key={alert.id}
+              className={`${theme === 'dark' ? 'bg-slate-900 border-slate-800 hover:border-violet-500' : 'bg-white border-gray-200 hover:border-blue-500'} rounded-xl border p-6 cursor-pointer transition-all hover:shadow-lg`}
+              onClick={() => handleAlertSelect(alert)}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                  {alert.name}
+                </h3>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSeverityColor(alert.severity)}`}>
+                  {alert.severity}
+                </span>
+              </div>
+              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-gray-600'} mb-4`}>
+                {alert.description}
+              </p>
+              <div className="flex items-center justify-between">
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${theme === 'dark' ? 'bg-slate-800 text-slate-300' : 'bg-gray-100 text-gray-700'}`}>
+                  {alert.category}
+                </span>
+                <button
+                  className={`text-sm font-medium ${theme === 'dark' ? 'text-violet-400 hover:text-violet-300' : 'text-blue-600 hover:text-blue-700'}`}
+                >
+                  Configure →
+                </button>
+              </div>
             </div>
-            <button className="text-blue-500 hover:text-blue-600 text-sm flex items-center space-x-1">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <span>Recommend alerts to your team</span>
-            </button>
-          </div>
+          ))}
+        </div>
+      </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {recommendedAlerts.map((alert) => (
-              <div
-                key={alert.id}
-                className={`${theme === 'dark' ? 'bg-[#13131f] border-slate-800 hover:border-slate-700' : 'bg-white border-gray-200 hover:border-gray-300'} border rounded-lg p-4 transition-all hover:shadow-lg`}
-              >
-                <div className="mb-3">
-                  <div className="flex items-start justify-between mb-2">
-                    <h4 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} text-sm`}>
-                      {alert.name}
-                    </h4>
-                    {alert.severity === 'critical' && (
-                      <span className="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded">
-                        critical
-                      </span>
-                    )}
-                  </div>
-                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mb-3`}>
-                    {alert.description}
-                  </p>
-                </div>
+      {/* Create Alert Side Panel */}
+      {showCreatePanel && selectedAlert && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+            onClick={() => {
+              setShowCreatePanel(false);
+              setSelectedAlert(null);
+              setError(null);
+              setSuccess(null);
+            }}
+          />
 
+          {/* Side Panel */}
+          <div className={`fixed top-0 right-0 h-full w-[500px] z-50 transform transition-transform duration-300 shadow-2xl ${theme === 'dark' ? 'bg-slate-900' : 'bg-white'} ${showCreatePanel ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="h-full flex flex-col overflow-hidden">
+              {/* Panel Header */}
+              <div className={`px-6 py-4 border-b ${theme === 'dark' ? 'border-slate-800' : 'border-gray-200'} flex-shrink-0`}>
                 <div className="flex items-center justify-between">
-                  <div className="flex flex-col space-y-1">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">
-                      {alert.badge}
-                    </span>
-                    <span className={`text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
-                      {alert.category}
-                    </span>
+                  <div>
+                    <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                      Create Alert: {selectedAlert.name}
+                    </h2>
+                    <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-gray-600'}`}>
+                      {selectedAlert.description}
+                    </p>
                   </div>
                   <button
-                    onClick={() => handleSelectTemplate(alert)}
-                    className="px-4 py-1.5 text-sm bg-purple-500 hover:bg-purple-600 text-white rounded transition-colors"
+                    onClick={() => {
+                      setShowCreatePanel(false);
+                      setSelectedAlert(null);
+                      setError(null);
+                      setSuccess(null);
+                    }}
+                    className={`${theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-gray-400 hover:text-gray-600'}`}
                   >
-                    Select
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
-      {/* Alert Templates Modal */}
-      {showTemplateModal && (
-        <AlertTemplatesModal
-          theme={theme}
-          onClose={() => setShowTemplateModal(false)}
-          onSelectTemplate={(template) => {
-            setSelectedTemplate(template);
-            setShowTemplateModal(false);
-            setShowNewAlertModal(true);
-          }}
-        />
-      )}
-
-      {/* New Alert From Template Modal */}
-      {showNewAlertModal && (
-        <NewAlertModal
-          theme={theme}
-          template={selectedTemplate}
-          onClose={() => {
-            setShowNewAlertModal(false);
-            setSelectedTemplate(null);
-          }}
-        />
-      )}
-    </div>
-  );
-};
-
-// Alert Templates Modal Component
-const AlertTemplatesModal = ({ theme, onClose, onSelectTemplate }) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All Alerts');
-
-  const categories = [
-    { name: 'All Alerts', count: 133 },
-    { name: 'Custom Alerts', count: 0 },
-    { name: 'Application Health', count: 18 },
-    { name: 'Control Plane', count: 28 },
-    { name: 'Info', count: 2 },
-    { name: 'Node/Cluster Health', count: 17 },
-    { name: 'Prometheus Health', count: 46 },
-    { name: 'Resource Usage', count: 7 },
-    { name: 'Storage', count: 15 }
-  ];
-
-  const templates = [
-    {
-      name: 'AlertmanagerClusterCrashlooping',
-      description: 'Half or more of the Alertmanager instances within the same cluster are crashlooping.',
-      category: 'Prometheus Health'
-    },
-    {
-      name: 'AlertmanagerClusterDown',
-      description: 'Half or more of the Alertmanager instances within the same cluster are down.',
-      category: 'Prometheus Health'
-    },
-    {
-      name: 'AlertmanagerClusterFailedToSendAlerts',
-      description: 'All Alertmanager instances in a cluster failed to send notifications to a critical integration.',
-      category: 'Prometheus Health'
-    },
-    {
-      name: 'AlertmanagerClusterFailedToSendAlerts',
-      description: 'All Alertmanager instances in a cluster failed to send notifications to a non-critical integration.',
-      category: 'Prometheus Health'
-    },
-    {
-      name: 'AlertmanagerConfigInconsistent',
-      description: 'Alertmanager instances within the same cluster have different configurations.',
-      category: 'Prometheus Health'
-    },
-    {
-      name: 'AlertmanagerFailedReload',
-      description: 'Reloading an Alertmanager configuration has failed.',
-      category: 'Prometheus Health'
-    },
-    {
-      name: 'AlertmanagerFailedToSendAlerts',
-      description: 'An Alertmanager instance failed to send notifications.',
-      category: 'Prometheus Health'
-    },
-    {
-      name: 'AlertmanagerMembersInconsistent',
-      description: 'A member of an Alertmanager cluster has not found all other cluster members.',
-      category: 'Prometheus Health'
-    },
-    {
-      name: 'ConfigReloaderSidecarErrors',
-      description: 'config-reloader sidecar has not had a successful reload for 10m',
-      category: 'Prometheus Health'
-    },
-    {
-      name: 'CPUThrottlingHigh',
-      description: 'Processes experience elevated CPU throttling.',
-      category: 'Application Health'
-    },
-    {
-      name: 'etcdDatabaseHighFragmentation',
-      description: 'etcd database size in use is less than 50% of the actual allocated storage.',
-      category: 'Control Plane'
-    },
-    {
-      name: 'etcdDatabaseQuotaLowSpace',
-      description: 'etcd cluster database is running full.',
-      category: 'Control Plane'
-    }
-  ];
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className={`${theme === 'dark' ? 'bg-[#13131f]' : 'bg-white'} rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col`}>
-        {/* Modal Header */}
-        <div className={`flex items-center justify-between px-6 py-4 ${theme === 'dark' ? 'border-slate-800' : 'border-gray-200'} border-b`}>
-          <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-            Alert Templates
-          </h2>
-          <button
-            onClick={onClose}
-            className={`p-2 ${theme === 'dark' ? 'hover:bg-slate-800' : 'hover:bg-gray-100'} rounded-lg transition-colors`}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Search and Actions */}
-        <div className={`px-6 py-4 ${theme === 'dark' ? 'border-slate-800' : 'border-gray-200'} border-b`}>
-          <div className="flex items-center justify-between">
-            <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-              Can't find what you are looking for?{' '}
-              <button className="text-blue-500 hover:text-blue-600">
-                Add your own template
-              </button>
-            </p>
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Type / to search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`pl-10 pr-4 py-2 ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-64`}
-                />
-                <svg className={`absolute left-3 top-2.5 w-5 h-5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <button className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium transition-colors">
-                Add Template
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Modal Content */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Categories Sidebar */}
-          <div className={`w-64 ${theme === 'dark' ? 'bg-[#0a0a0f] border-slate-800' : 'bg-gray-50 border-gray-200'} border-r p-4 overflow-y-auto`}>
-            <div className="space-y-1">
-              {categories.map((category) => (
-                <button
-                  key={category.name}
-                  onClick={() => setSelectedCategory(category.name)}
-                  className={`w-full px-3 py-2 text-left text-sm rounded-lg transition-colors ${
-                    selectedCategory === category.name
-                      ? theme === 'dark'
-                        ? 'bg-violet-600/20 text-white'
-                        : 'bg-blue-50 text-gray-900'
-                      : theme === 'dark'
-                      ? 'text-gray-300 hover:bg-slate-800'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span>{category.name}</span>
-                    <span className={`text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
-                      ({category.count})
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Templates Grid */}
-          <div className="flex-1 p-6 overflow-y-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {templates.map((template, index) => (
-                <div
-                  key={index}
-                  className={`${theme === 'dark' ? 'bg-[#13131f] border-slate-800' : 'bg-white border-gray-200'} border rounded-lg p-4`}
-                >
-                  <h4 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} text-sm mb-2`}>
-                    {template.name}
-                  </h4>
-                  <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mb-3`}>
-                    {template.description}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className={`text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
-                      {template.category}
-                    </span>
-                    <button
-                      onClick={() => onSelectTemplate(template)}
-                      className="px-3 py-1 text-xs bg-purple-500 hover:bg-purple-600 text-white rounded transition-colors"
-                    >
-                      Select
-                    </button>
-                  </div>
+              {/* Panel Body */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Success/Error Messages */}
+              {success && (
+                <div className="bg-green-100 dark:bg-green-900/20 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-400 px-4 py-3 rounded">
+                  {success}
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+              )}
+              {error && (
+                <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-400 px-4 py-3 rounded">
+                  {error}
+                </div>
+              )}
 
-// New Alert Modal Component
-const NewAlertModal = ({ theme, template, onClose }) => {
-  const [formData, setFormData] = useState({
-    clusterScope: 'all',
-    namespaceScope: 'all',
-    duration: '5',
-    durationUnit: 'minutes',
-    severity: 'Critical',
-    job: '*alertmanager',
-    restartThreshold: '4',
-    crashloopingRatio: '0.5'
-  });
+              {/* Step 1: Set up scope */}
+              <div>
+                <h3 className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                  1. Set up scope
+                </h3>
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className={`${theme === 'dark' ? 'bg-[#13131f]' : 'bg-white'} rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto`}>
-        {/* Modal Header */}
-        <div className={`sticky top-0 ${theme === 'dark' ? 'bg-[#13131f] border-slate-800' : 'bg-white border-gray-200'} border-b px-6 py-4 z-10`}>
-          <div className="flex items-center justify-between">
-            <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              New alert from template
-            </h2>
-            <button
-              onClick={onClose}
-              className={`p-2 ${theme === 'dark' ? 'hover:bg-slate-800' : 'hover:bg-gray-100'} rounded-lg transition-colors`}
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
+                {/* Cluster Selection */}
+                <div className="mb-4">
+                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}`}>
+                    Cluster
+                  </label>
+                  <select
+                    value={formData.cluster}
+                    onChange={(e) => handleClusterChange(e.target.value)}
+                    className={`w-full px-4 py-2 rounded-lg border ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                  >
+                    {clusters.length === 0 ? (
+                      <option value="">No clusters available</option>
+                    ) : (
+                      clusters.map(cluster => (
+                        <option key={cluster.id} value={cluster.id}>
+                          {cluster.name || cluster.id}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
 
-        {/* Modal Content */}
-        <div className="p-6">
-          <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>
-            {template?.name || 'AlertmanagerClusterCrashlooping'}
-          </h3>
-
-          {/* Alert Summary */}
-          <div className="mb-6">
-            <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
-              Alert summary
-            </label>
-            <input
-              type="text"
-              defaultValue="Half or more of the Alertmanager instances within the same cluster are crashlooping."
-              className={`w-full px-4 py-2 ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
-            />
-          </div>
-
-          {/* Alert Description */}
-          <div className="mb-6">
-            <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
-              Alert description
-            </label>
-            <textarea
-              rows={3}
-              defaultValue="{{ $value | humanizePercentage }} of Alertmanager instances within the {{$labels.job}} cluster have restarted at least 5 times in the last 10m."
-              className={`w-full px-4 py-2 ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
-            />
-          </div>
-
-          {/* 1. Set up scope */}
-          <div className="mb-6">
-            <h4 className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-3`}>
-              1. Set up scope
-            </h4>
-            <div className="space-y-4">
-              <div className="flex items-center space-x-4">
-                <label className="flex items-center space-x-2">
-                  <input type="radio" name="cluster" defaultChecked className="text-blue-500" />
-                  <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>All Clusters</span>
-                </label>
-                <label className="flex items-center space-x-2">
-                  <input type="radio" name="cluster" className="text-blue-500" />
-                  <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Specific</span>
-                </label>
-                <select className={`flex-1 px-3 py-2 ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'} border rounded-lg text-sm`}>
-                  <option>Select Clusters</option>
-                </select>
+                {/* Namespace Selection */}
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}`}>
+                    Namespace
+                  </label>
+                  <select
+                    value={formData.namespace}
+                    onChange={(e) => setFormData({ ...formData, namespace: e.target.value })}
+                    className={`w-full px-4 py-2 rounded-lg border ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                  >
+                    {namespaces.map(ns => (
+                      <option key={ns} value={ns}>
+                        {ns === 'all' ? 'All Namespaces' : ns}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="flex items-center space-x-4">
-                <label className="flex items-center space-x-2">
-                  <input type="radio" name="namespace" defaultChecked className="text-blue-500" />
-                  <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>All Namespaces</span>
-                </label>
-                <label className="flex items-center space-x-2">
-                  <input type="radio" name="namespace" className="text-blue-500" />
-                  <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Specific</span>
-                </label>
-                <select className={`flex-1 px-3 py-2 ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'} border rounded-lg text-sm`}>
-                  <option>Select Namespaces</option>
-                </select>
-              </div>
-            </div>
-          </div>
 
-          {/* 2. Define time */}
-          <div className="mb-6">
-            <h4 className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-3`}>
-              2. Define time
-            </h4>
-            <div className="flex items-center space-x-3">
-              <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                Condition is true for at least
-              </span>
-              <input
-                type="number"
-                value={formData.duration}
-                onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                className={`w-20 px-3 py-2 ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'} border rounded-lg text-sm`}
-              />
-              <select
-                value={formData.durationUnit}
-                onChange={(e) => setFormData({ ...formData, durationUnit: e.target.value })}
-                className={`px-3 py-2 ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'} border rounded-lg text-sm`}
-              >
-                <option>minutes</option>
-                <option>hours</option>
-                <option>days</option>
-              </select>
-            </div>
-          </div>
-
-          {/* 3. Choose priority */}
-          <div className="mb-6">
-            <h4 className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-3`}>
-              3. Choose priority
-            </h4>
-            <div className="flex items-center space-x-3">
-              <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                Severity Level
-              </span>
-              <select
-                value={formData.severity}
-                onChange={(e) => setFormData({ ...formData, severity: e.target.value })}
-                className={`px-4 py-2 ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'} border rounded-lg text-sm`}
-              >
-                <option className="text-red-600">Critical</option>
-                <option className="text-yellow-600">Warning</option>
-                <option className="text-blue-600">Info</option>
-              </select>
-            </div>
-          </div>
-
-          {/* 4. Configure template variables */}
-          <div className="mb-6">
-            <h4 className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-3`}>
-              4. Configure template variables
-            </h4>
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <label className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} w-48`}>
-                  Job
-                </label>
-                <input
-                  type="text"
-                  value={formData.job}
-                  onChange={(e) => setFormData({ ...formData, job: e.target.value })}
-                  className={`flex-1 px-4 py-2 ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'} border rounded-lg text-sm`}
-                />
+              {/* Step 2: Configure Variables */}
+              <div>
+                <h3 className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                  2. Configure alert parameters
+                </h3>
+                {selectedAlert.variables.map(variable => (
+                  <div key={variable.name} className="mb-4">
+                    <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}`}>
+                      {variable.label}
+                    </label>
+                    <input
+                      type={variable.type}
+                      min={variable.min}
+                      max={variable.max}
+                      value={formData.variables[variable.name] || variable.default}
+                      onChange={(e) => handleVariableChange(variable.name, Number(e.target.value))}
+                      className={`w-full px-4 py-2 rounded-lg border ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                    />
+                  </div>
+                ))}
               </div>
-              <div className="flex items-center space-x-3">
-                <label className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} w-48`}>
-                  Restart Threshold
-                </label>
-                <input
-                  type="number"
-                  value={formData.restartThreshold}
-                  onChange={(e) => setFormData({ ...formData, restartThreshold: e.target.value })}
-                  className={`flex-1 px-4 py-2 ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'} border rounded-lg text-sm`}
-                />
+
+              {/* Step 3: Choose Priority */}
+              <div>
+                <h3 className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                  3. Choose priority
+                </h3>
+                <div className="flex space-x-3">
+                  {severityLevels.map(level => (
+                    <button
+                      key={level.id}
+                      onClick={() => setFormData({ ...formData, severity: level.id })}
+                      className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                        formData.severity === level.id
+                          ? `border-${level.color}-500 ${theme === 'dark' ? `bg-${level.color}-900/20 text-${level.color}-400` : `bg-${level.color}-100 text-${level.color}-700`}`
+                          : theme === 'dark'
+                          ? 'border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600'
+                          : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                      }`}
+                    >
+                      {level.name}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex items-center space-x-3">
-                <label className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} w-48`}>
-                  Cluster Crashlooping Ratio
-                </label>
-                <input
-                  type="text"
-                  value={formData.crashloopingRatio}
-                  onChange={(e) => setFormData({ ...formData, crashloopingRatio: e.target.value })}
-                  className={`flex-1 px-4 py-2 ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'} border rounded-lg text-sm`}
-                />
+
+              {/* PromQL Preview */}
+              <div>
+                <h3 className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                  PromQL Preview
+                </h3>
+                <div className={`${theme === 'dark' ? 'bg-slate-950 border-slate-800' : 'bg-gray-900 border-gray-700'} rounded-lg border p-4 font-mono text-sm overflow-x-auto`}>
+                  <pre className="text-green-400">
+                    {selectedCluster && selectedAlert.promql(formData.variables, selectedCluster.name, formData.namespace)}
+                  </pre>
+                </div>
+              </div>
+              </div>
+
+              {/* Panel Footer */}
+              <div className={`px-6 py-4 border-t ${theme === 'dark' ? 'border-slate-800 bg-slate-900' : 'border-gray-200 bg-gray-50'} flex-shrink-0 flex justify-end space-x-3`}>
+                <button
+                  onClick={() => {
+                    setShowCreatePanel(false);
+                    setSelectedAlert(null);
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                  className={`px-6 py-2 rounded-lg font-medium ${theme === 'dark' ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateAlert}
+                  disabled={creating || !selectedCluster}
+                  className={`px-6 py-2 rounded-lg font-medium ${theme === 'dark' ? 'bg-violet-600 hover:bg-violet-700' : 'bg-blue-600 hover:bg-blue-700'} text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2`}
+                >
+                  {creating ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <span>Create Alert</span>
+                  )}
+                </button>
               </div>
             </div>
-
-            <button className={`mt-4 text-sm ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'} hover:underline flex items-center space-x-1`}>
-              <span>See PromQL</span>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
           </div>
-        </div>
-
-        {/* Modal Footer */}
-        <div className={`sticky bottom-0 ${theme === 'dark' ? 'bg-[#13131f] border-slate-800' : 'bg-white border-gray-200'} border-t px-6 py-4 flex items-center justify-between`}>
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={onClose}
-              className={`px-4 py-2 ${theme === 'dark' ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-gray-900'} transition-colors`}
-            >
-              Cancel
-            </button>
-            <button className="text-blue-500 hover:text-blue-600 flex items-center space-x-1">
-              <span>Using External Prometheus?</span>
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
-            </button>
-          </div>
-          <button className="px-6 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium transition-colors">
-            Create new alert
-          </button>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 };

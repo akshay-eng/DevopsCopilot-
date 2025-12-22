@@ -13,11 +13,20 @@ const OAuthCallback = () => {
 
   useEffect(() => {
     const processCallback = async () => {
+      // Get query parameters
+      const params = new URLSearchParams(window.location.search);
+      const needsOnboarding = params.get('onboarding') === 'true';
+
       const result = await handleOAuthCallback();
 
       if (result.success) {
-        // Redirect to dashboard on success
-        navigate('/dashboard', { replace: true });
+        // Check if user needs to complete onboarding
+        if (needsOnboarding) {
+          navigate('/onboarding', { replace: true });
+        } else {
+          // Redirect to dashboard for existing users
+          navigate('/dashboard', { replace: true });
+        }
       } else {
         // Show error and redirect to login after 3 seconds
         setError(result.error);

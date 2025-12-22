@@ -2,7 +2,7 @@
  * Authentication Service - All auth-related API calls
  */
 
-import { api, API_URL } from './api';
+import { authApi, AUTH_SERVICE_URL } from './api';
 
 const authService = {
   /**
@@ -10,7 +10,7 @@ const authService = {
    */
   register: async (email, username, password) => {
     try {
-      const data = await api.post('/api/auth/register', {
+      const data = await authApi.post('/api/auth/register', {
         email,
         username,
         password,
@@ -34,7 +34,7 @@ const authService = {
    */
   login: async (email, password) => {
     try {
-      const data = await api.post('/api/auth/login', {
+      const data = await authApi.post('/api/auth/login', {
         email,
         password,
       }, { skipAuth: true });
@@ -66,7 +66,7 @@ const authService = {
    */
   getCurrentUser: async () => {
     try {
-      const data = await api.get('/api/auth/me');
+      const data = await authApi.get('/api/auth/me');
       localStorage.setItem('user', JSON.stringify(data.user));
       return { success: true, data: data.user };
     } catch (error) {
@@ -94,7 +94,7 @@ const authService = {
    */
   validateToken: async () => {
     try {
-      const data = await api.get('/api/auth/validate');
+      const data = await authApi.get('/api/auth/validate');
       return { success: true, data };
     } catch (error) {
       return { success: false, error: error.message };
@@ -105,14 +105,14 @@ const authService = {
    * Initiate Google OAuth login
    */
   loginWithGoogle: () => {
-    window.location.href = `${API_URL}/api/oauth/google`;
+    window.location.href = `${AUTH_SERVICE_URL}/api/oauth/google`;
   },
 
   /**
    * Initiate GitHub OAuth login
    */
   loginWithGitHub: () => {
-    window.location.href = `${API_URL}/api/oauth/github`;
+    window.location.href = `${AUTH_SERVICE_URL}/api/oauth/github`;
   },
 
   /**

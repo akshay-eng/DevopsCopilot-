@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { api } from '../services/api';
+import { authApi } from '../services/api';
 
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();
@@ -37,16 +37,15 @@ const ResetPassword = () => {
       return;
     }
 
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long');
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
       return;
     }
 
     setLoading(true);
 
     try {
-      await api.post('/api/email/reset-password', {
-        token,
+      await authApi.post(`/api/auth/reset-password/${token}`, {
         password: formData.password
       });
 
@@ -54,7 +53,7 @@ const ResetPassword = () => {
       alert('Password reset successfully! Please login with your new password.');
       navigate('/login');
     } catch (error) {
-      setError(error.response?.data?.error || 'Failed to reset password. The link may have expired.');
+      setError(error.error || 'Failed to reset password. The link may have expired.');
     } finally {
       setLoading(false);
     }
@@ -126,7 +125,7 @@ const ResetPassword = () => {
                 onChange={handleChange}
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
-                placeholder="Enter new password (min. 8 characters)"
+                placeholder="Enter new password (min. 6 characters)"
                 disabled={loading}
               />
               <button

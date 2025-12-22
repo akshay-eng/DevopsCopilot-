@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { logout } from '../redux/slices/authSlice';
 import { useTheme } from '../context/ThemeContext';
-import { useAuth } from '../hooks/useAuth';
 import SettingsPanel from './SettingsPanel';
 import FloatingChat from './FloatingChat';
 
 const DashboardLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useDispatch();
   const { theme } = useTheme();
-  const { user, logout } = useAuth();
+  const { user } = useSelector(state => state.auth);
   const [showSettings, setShowSettings] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -17,18 +19,15 @@ const DashboardLayout = () => {
 
   const isActive = (path) => location.pathname === path;
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await dispatch(logout());
     navigate('/login');
   };
 
   // Get user initials for avatar
   const getUserInitials = () => {
-    if (user?.full_name) {
-      return user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-    }
-    if (user?.username) {
-      return user.username.slice(0, 2).toUpperCase();
+    if (user?.name) {
+      return user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     }
     if (user?.email) {
       return user.email.slice(0, 2).toUpperCase();
@@ -37,7 +36,7 @@ const DashboardLayout = () => {
   };
 
   const getUserDisplayName = () => {
-    return user?.full_name || user?.username || user?.email || 'User';
+    return user?.name || user?.email || 'User';
   };
 
   return (
@@ -195,7 +194,15 @@ const DashboardLayout = () => {
             <button className={`w-full py-2 px-3 text-left text-sm ${theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'} rounded transition-colors ${sidebarCollapsed ? 'flex justify-center' : ''}`} title={sidebarCollapsed ? 'Custom Resources' : ''}>
               {sidebarCollapsed ? '📦' : 'Custom Resources'}
             </button>
-            <button className={`w-full py-2 px-3 text-left text-sm ${theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'} rounded transition-colors flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`} title={sidebarCollapsed ? 'Clusters' : ''}>
+            <button
+              onClick={() => navigate('/dashboard/clusters')}
+              className={`w-full py-2 px-3 text-left text-sm ${
+                isActive('/dashboard/clusters') || location.pathname.startsWith('/dashboard/clusters/')
+                  ? theme === 'dark' ? 'text-white bg-violet-600/20 border-l-2 border-violet-500' : 'text-gray-900 bg-blue-50 border-l-2 border-blue-500'
+                  : theme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
+              } rounded transition-colors flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}
+              title={sidebarCollapsed ? 'Clusters' : ''}
+            >
               {sidebarCollapsed ? '☸' : (
                 <>
                   <span>Clusters</span>

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { logout } from '../redux/slices/authSlice';
 import ClusterSetup from './onboarding/ClusterSetup';
 import InstallationInstructions from './onboarding/InstallationInstructions';
 import ConnectivityTest from './onboarding/ConnectivityTest';
@@ -8,6 +10,7 @@ import OnboardingComplete from './onboarding/OnboardingComplete';
 
 const Onboarding = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [currentStep, setCurrentStep] = useState(1);
   const [onboardingData, setOnboardingData] = useState({
     clusterType: '',
@@ -77,6 +80,11 @@ const Onboarding = () => {
     }
   };
 
+  const handleSignOut = async () => {
+    await dispatch(logout());
+    navigate('/login');
+  };
+
   const renderStep = () => {
     switch (currentStep) {
       case 1:
@@ -108,7 +116,7 @@ const Onboarding = () => {
             <span className="text-xl font-bold text-white">AIOps Platform</span>
           </div>
           <button
-            onClick={() => navigate('/login')}
+            onClick={handleSignOut}
             className="text-slate-400 hover:text-white text-sm font-medium transition-colors"
           >
             Sign Out

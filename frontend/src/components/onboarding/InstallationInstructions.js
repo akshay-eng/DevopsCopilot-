@@ -41,18 +41,27 @@ const InstallationInstructions = ({ data, updateData, nextStep, prevStep }) => {
       });
     }
 
-    steps.push({
-      title: 'Install AIOps Platform Agent',
-      description: 'Deploy the AIOps platform agent to your cluster',
-      commands: [
-        'helm repo add aiops https://charts.aiops-platform.io',
-        'helm repo update',
-        `helm install aiops-agent aiops/aiops-agent \\
+    // Use real Helm command if available, otherwise show placeholder
+    if (data.helmCommand) {
+      steps.push({
+        title: 'Install AIOps Platform Agent',
+        description: 'Deploy the AIOps platform agent to your cluster (credentials included)',
+        commands: [data.helmCommand]
+      });
+    } else {
+      steps.push({
+        title: 'Install AIOps Platform Agent',
+        description: 'Deploy the AIOps platform agent to your cluster',
+        commands: [
+          'helm repo add aiops https://charts.aiops-platform.io',
+          'helm repo update',
+          `helm install aiops-agent aiops/aiops-agent \\
   --namespace aiops-platform \\
   --set clusterType=${data.clusterType} \\
   --set auth.apiKey=YOUR_API_KEY_HERE`
-      ]
-    });
+        ]
+      });
+    }
 
     steps.push({
       title: 'Verify Installation',
