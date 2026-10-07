@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-webhook-service
+  namespace: alerts
+  labels:
+    app: alert-webhook-service
+    component: alerting
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: alert-webhook-service
+  template:
+    metadata:
+      labels:
+        app: alert-webhook-service
+        component: alerting
+    spec:
+      serviceAccountName: alert-webhook-sa
+      containers:
+        - name: alert-webhook
+          image: ak3hay/alert-webhook-service:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: alert-webhook-config
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/detailed
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      restartPolicy: Always

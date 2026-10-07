@@ -1,0 +1,19 @@
+{
+  "name": "aiops-pi-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AIOps DevOps Copilot agent runtime built on the Pi toolkit (earendil-works/pi). Full-swap replacement for the LangGraph deep-agent, with modular BYO on-prem + cloud models.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "@mariozechner/pi-ai": "^0.73.1",
+    "@mariozechner/pi-agent-core": "^0.73.1",
+    "express": "^4.21.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7"
+  }
+}

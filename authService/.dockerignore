@@ -1,0 +1,13 @@
+node_modules
+.env
+.env.*
+*.log
+authservice.log
+TEST_WEBSOCKET.html
+test-*.js
+debug-*.js
+server-old.js
+server-with-socketio.js
+start-with-socketio.sh
+stream_alerts.js
+.git

@@ -1,0 +1,42 @@
+# RBAC for the AIOps backend (authService) to READ Trivy reports, and — optionally —
+# to PATCH workloads for agentic remediation.
+#
+# Adjust `subjects` to match the ServiceAccount your authService pod runs as.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: aiops-vulnerability-reader
+rules:
+  - apiGroups: ["aquasecurity.github.io"]
+    resources:
+      - vulnerabilityreports
+      - configauditreports
+      - exposedsecretreports
+      - rbacassessmentreports
+    verbs: ["get", "list", "watch"]
+  # Needed to resolve pod -> ReplicaSet -> Deployment owner chains and read images.
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  # --- Agentic remediation (OPTIONAL) --------------------------------------
+  # Uncomment to let the Remediate button roll a workload's image to a fixed
+  # version directly. Leave commented to keep remediation ticket-only.
+  # - apiGroups: ["apps"]
+  #   resources: ["deployments", "statefulsets", "daemonsets"]
+  #   verbs: ["patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: aiops-vulnerability-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: aiops-vulnerability-reader
+subjects:
+  - kind: ServiceAccount
+    name: default          # <-- change to your authService ServiceAccount
+    namespace: default     # <-- change to the namespace authService runs in

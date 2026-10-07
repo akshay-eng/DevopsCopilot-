@@ -1,0 +1,547 @@
+{
+    "kubernetes_problems": [
+      {
+        "id": "K8S-001",
+        "title": "Pod Stuck in Pending State",
+        "severity": "High",
+        "category": "Scheduling",
+        "description": "Multiple pods remain in Pending state and are not being scheduled to any nodes",
+        "symptoms": [
+          "kubectl get pods shows status as Pending",
+          "Pods never transition to Running state",
+          "Application unavailable to users"
+        ],
+        "root_cause_analysis": {
+          "primary_cause": "Insufficient cluster resources",
+          "investigation_steps": [
+            "Check node resource availability using 'kubectl describe nodes'",
+            "Verify pod resource requests vs available capacity",
+            "Examine scheduler logs for scheduling failures",
+            "Check for node taints and pod tolerations",
+            "Verify node selectors and affinity rules"
+          ],
+          "common_causes": [
+            "Insufficient CPU or memory on nodes",
+            "Node taints preventing scheduling",
+            "Resource requests exceeding node capacity",
+            "Node selectors not matching any nodes",
+            "Persistent volume claims not bound"
+          ]
+        },
+        "resolution_steps": [
+          {
+            "step": 1,
+            "action": "Describe the pending pod",
+            "command": "kubectl describe pod <pod-name> -n <namespace>",
+            "expected_output": "Shows events and scheduling failures"
+          },
+          {
+            "step": 2,
+            "action": "Check node resources",
+            "command": "kubectl top nodes",
+            "expected_output": "Shows current resource utilization"
+          },
+          {
+            "step": 3,
+            "action": "Scale cluster if needed",
+            "command": "kubectl scale deployment <deployment-name> --replicas=<desired-count>",
+            "expected_output": "Deployment scaled successfully"
+          },
+          {
+            "step": 4,
+            "action": "Add more nodes to cluster",
+            "command": "# Cloud provider specific scaling commands",
+            "expected_output": "New nodes join the cluster"
+          },
+          {
+            "step": 5,
+            "action": "Verify pod scheduling",
+            "command": "kubectl get pods -w",
+            "expected_output": "Pods transition to Running state"
+          }
+        ],
+        "prevention": [
+          "Implement cluster autoscaling",
+          "Set appropriate resource requests and limits",
+          "Monitor cluster resource utilization",
+          "Use horizontal pod autoscaling (HPA)"
+        ]
+      },
+      {
+        "id": "K8S-002",
+        "title": "Service Discovery Failure",
+        "severity": "Critical",
+        "category": "Networking",
+        "description": "Applications cannot communicate with each other through Kubernetes services",
+        "symptoms": [
+          "Connection timeouts between services",
+          "DNS resolution failures",
+          "502/503 HTTP errors from applications",
+          "Service endpoints showing as empty"
+        ],
+        "root_cause_analysis": {
+          "primary_cause": "DNS or service configuration issues",
+          "investigation_steps": [
+            "Test DNS resolution from within pods",
+            "Check service endpoint configuration",
+            "Verify pod labels match service selectors",
+            "Examine CoreDNS logs and configuration",
+            "Test connectivity using service ClusterIP"
+          ],
+          "common_causes": [
+            "Service selector not matching pod labels",
+            "CoreDNS configuration issues",
+            "Network policies blocking traffic",
+            "Incorrect service port configuration",
+            "Pod readiness probe failures"
+          ]
+        },
+        "resolution_steps": [
+          {
+            "step": 1,
+            "action": "Check service configuration",
+            "command": "kubectl describe service <service-name> -n <namespace>",
+            "expected_output": "Shows service details and endpoints"
+          },
+          {
+            "step": 2,
+            "action": "Verify pod labels",
+            "command": "kubectl get pods --show-labels -n <namespace>",
+            "expected_output": "Lists all pods with their labels"
+          },
+          {
+            "step": 3,
+            "action": "Test DNS resolution",
+            "command": "kubectl exec -it <pod-name> -- nslookup <service-name>.<namespace>.svc.cluster.local",
+            "expected_output": "Returns service IP address"
+          },
+          {
+            "step": 4,
+            "action": "Check CoreDNS status",
+            "command": "kubectl get pods -n kube-system -l k8s-app=kube-dns",
+            "expected_output": "CoreDNS pods are running"
+          },
+          {
+            "step": 5,
+            "action": "Test service connectivity",
+            "command": "kubectl exec -it <pod-name> -- curl <service-name>:<port>",
+            "expected_output": "Successful connection to service"
+          }
+        ],
+        "prevention": [
+          "Use consistent labeling strategy",
+          "Implement service mesh for better observability",
+          "Monitor DNS resolution metrics",
+          "Regular health checks for CoreDNS"
+        ]
+      },
+      {
+        "id": "K8S-003",
+        "title": "Persistent Volume Mount Failure",
+        "severity": "High",
+        "category": "Storage",
+        "description": "Pods fail to mount persistent volumes causing application data loss or startup failures",
+        "symptoms": [
+          "Pod stuck in ContainerCreating state",
+          "Mount errors in pod events",
+          "Application cannot access persistent data",
+          "Volume attachment timeouts"
+        ],
+        "root_cause_analysis": {
+          "primary_cause": "Storage provisioning or attachment issues",
+          "investigation_steps": [
+            "Check PVC status and binding",
+            "Verify storage class availability",
+            "Examine volume attachment status on nodes",
+            "Check storage provider logs",
+            "Verify node disk space and permissions"
+          ],
+          "common_causes": [
+            "PVC not bound to PV",
+            "Storage class misconfiguration",
+            "Node disk space exhaustion",
+            "Incorrect volume permissions",
+            "Storage backend connectivity issues"
+          ]
+        },
+        "resolution_steps": [
+          {
+            "step": 1,
+            "action": "Check PVC status",
+            "command": "kubectl get pvc -n <namespace>",
+            "expected_output": "Shows PVC binding status"
+          },
+          {
+            "step": 2,
+            "action": "Describe failing pod",
+            "command": "kubectl describe pod <pod-name> -n <namespace>",
+            "expected_output": "Shows mount-related events and errors"
+          },
+          {
+            "step": 3,
+            "action": "Check storage class",
+            "command": "kubectl get storageclass",
+            "expected_output": "Lists available storage classes"
+          },
+          {
+            "step": 4,
+            "action": "Verify node disk space",
+            "command": "kubectl exec -it <pod-name> -- df -h",
+            "expected_output": "Shows disk usage on mounted volumes"
+          },
+          {
+            "step": 5,
+            "action": "Recreate PVC if needed",
+            "command": "kubectl delete pvc <pvc-name> -n <namespace> && kubectl apply -f <pvc-manifest>",
+            "expected_output": "PVC recreated and bound successfully"
+          }
+        ],
+        "prevention": [
+          "Monitor storage utilization",
+          "Implement backup strategies",
+          "Use dynamic provisioning",
+          "Regular storage health checks"
+        ]
+      },
+      {
+        "id": "K8S-004",
+        "title": "High CPU/Memory Usage",
+        "severity": "Medium",
+        "category": "Performance",
+        "description": "Nodes or pods experiencing high resource utilization causing performance degradation",
+        "symptoms": [
+          "Slow application response times",
+          "Pod evictions due to resource pressure",
+          "Node NotReady status",
+          "OOMKilled container restarts"
+        ],
+        "root_cause_analysis": {
+          "primary_cause": "Resource exhaustion or inefficient resource allocation",
+          "investigation_steps": [
+            "Monitor resource usage with kubectl top",
+            "Check resource limits and requests",
+            "Analyze application performance metrics",
+            "Review pod eviction events",
+            "Examine node resource pressure conditions"
+          ],
+          "common_causes": [
+            "Memory leaks in applications",
+            "Insufficient resource limits",
+            "CPU-intensive operations",
+            "Too many pods on single node",
+            "Inefficient application code"
+          ]
+        },
+        "resolution_steps": [
+          {
+            "step": 1,
+            "action": "Check resource usage",
+            "command": "kubectl top pods -n <namespace> --sort-by=cpu",
+            "expected_output": "Shows pods sorted by CPU usage"
+          },
+          {
+            "step": 2,
+            "action": "Analyze node resources",
+            "command": "kubectl describe node <node-name>",
+            "expected_output": "Shows node capacity and allocated resources"
+          },
+          {
+            "step": 3,
+            "action": "Update resource limits",
+            "command": "kubectl patch deployment <deployment-name> -p '{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"<container-name>\",\"resources\":{\"limits\":{\"memory\":\"1Gi\",\"cpu\":\"500m\"}}}]}}}}'",
+            "expected_output": "Deployment updated with new resource limits"
+          },
+          {
+            "step": 4,
+            "action": "Scale deployment",
+            "command": "kubectl scale deployment <deployment-name> --replicas=<new-count>",
+            "expected_output": "Deployment scaled to distribute load"
+          },
+          {
+            "step": 5,
+            "action": "Enable horizontal pod autoscaler",
+            "command": "kubectl autoscale deployment <deployment-name> --cpu-percent=80 --min=3 --max=10",
+            "expected_output": "HPA created successfully"
+          }
+        ],
+        "prevention": [
+          "Set appropriate resource requests and limits",
+          "Implement monitoring and alerting",
+          "Use vertical pod autoscaling (VPA)",
+          "Regular performance testing"
+        ]
+      },
+      {
+        "id": "K8S-005",
+        "title": "ImagePullBackOff Error",
+        "severity": "High",
+        "category": "Container",
+        "description": "Pods fail to start due to inability to pull container images",
+        "symptoms": [
+          "Pod status shows ImagePullBackOff",
+          "Container creation failures",
+          "Application deployment rollout stuck",
+          "Image pull errors in events"
+        ],
+        "root_cause_analysis": {
+          "primary_cause": "Image registry connectivity or authentication issues",
+          "investigation_steps": [
+            "Verify image name and tag accuracy",
+            "Check registry authentication credentials",
+            "Test network connectivity to registry",
+            "Examine image pull secrets configuration",
+            "Verify image exists in registry"
+          ],
+          "common_causes": [
+            "Incorrect image name or tag",
+            "Missing or expired registry credentials",
+            "Network connectivity issues to registry",
+            "Image does not exist in registry",
+            "Registry authentication failures"
+          ]
+        },
+        "resolution_steps": [
+          {
+            "step": 1,
+            "action": "Check pod events",
+            "command": "kubectl describe pod <pod-name> -n <namespace>",
+            "expected_output": "Shows image pull error details"
+          },
+          {
+            "step": 2,
+            "action": "Verify image exists",
+            "command": "docker pull <image-name>:<tag>",
+            "expected_output": "Image pulls successfully or shows specific error"
+          },
+          {
+            "step": 3,
+            "action": "Check image pull secrets",
+            "command": "kubectl get secrets -n <namespace>",
+            "expected_output": "Lists available secrets including registry secrets"
+          },
+          {
+            "step": 4,
+            "action": "Create registry secret if missing",
+            "command": "kubectl create secret docker-registry <secret-name> --docker-server=<registry-url> --docker-username=<username> --docker-password=<password> -n <namespace>",
+            "expected_output": "Registry secret created successfully"
+          },
+          {
+            "step": 5,
+            "action": "Update deployment with secret",
+            "command": "kubectl patch deployment <deployment-name> -p '{\"spec\":{\"template\":{\"spec\":{\"imagePullSecrets\":[{\"name\":\"<secret-name>\"}]}}}}'",
+            "expected_output": "Deployment updated with image pull secret"
+          }
+        ],
+        "prevention": [
+          "Use image scanning and vulnerability management",
+          "Implement image caching strategies",
+          "Monitor registry availability",
+          "Regular credential rotation"
+        ]
+      },
+      {
+        "id": "K8S-006",
+        "title": "Ingress Controller Not Working",
+        "severity": "Critical",
+        "category": "Networking",
+        "description": "External traffic cannot reach applications due to ingress controller issues",
+        "symptoms": [
+          "External URLs return 404 or 502 errors",
+          "Ingress controller pods not running",
+          "SSL/TLS certificate issues",
+          "Load balancer not forwarding traffic"
+        ],
+        "root_cause_analysis": {
+          "primary_cause": "Ingress controller misconfiguration or failure",
+          "investigation_steps": [
+            "Check ingress controller pod status",
+            "Verify ingress resource configuration",
+            "Test load balancer connectivity",
+            "Examine SSL certificate validity",
+            "Check DNS resolution for ingress hostnames"
+          ],
+          "common_causes": [
+            "Ingress controller pod failures",
+            "Incorrect ingress rule configuration",
+            "SSL certificate expiration",
+            "Load balancer health check failures",
+            "DNS misconfiguration"
+          ]
+        },
+        "resolution_steps": [
+          {
+            "step": 1,
+            "action": "Check ingress controller status",
+            "command": "kubectl get pods -n ingress-nginx -l app.kubernetes.io/component=controller",
+            "expected_output": "Ingress controller pods are running"
+          },
+          {
+            "step": 2,
+            "action": "Verify ingress resources",
+            "command": "kubectl get ingress -A",
+            "expected_output": "Shows all ingress resources and their status"
+          },
+          {
+            "step": 3,
+            "action": "Check ingress controller logs",
+            "command": "kubectl logs -n ingress-nginx deployment/ingress-nginx-controller",
+            "expected_output": "Shows controller logs for debugging"
+          },
+          {
+            "step": 4,
+            "action": "Test service connectivity",
+            "command": "kubectl port-forward -n <namespace> service/<service-name> 8080:80",
+            "expected_output": "Port forwarding works, confirming service is accessible"
+          },
+          {
+            "step": 5,
+            "action": "Update ingress configuration",
+            "command": "kubectl apply -f <ingress-manifest.yaml>",
+            "expected_output": "Ingress resource updated successfully"
+          }
+        ],
+        "prevention": [
+          "Monitor ingress controller health",
+          "Automate SSL certificate renewal",
+          "Implement multiple ingress controllers for HA",
+          "Regular DNS and connectivity testing"
+        ]
+      },
+      {
+        "id": "K8S-007",
+        "title": "ConfigMap/Secret Not Mounted",
+        "severity": "Medium",
+        "category": "Configuration",
+        "description": "Applications cannot access configuration data due to mounting issues",
+        "symptoms": [
+          "Application configuration not loading",
+          "Missing environment variables",
+          "File mount errors in pod events",
+          "Application using default configurations"
+        ],
+        "root_cause_analysis": {
+          "primary_cause": "ConfigMap or Secret mounting configuration errors",
+          "investigation_steps": [
+            "Verify ConfigMap/Secret exists in correct namespace",
+            "Check volume mount configuration in pod spec",
+            "Examine pod events for mount errors",
+            "Verify file permissions and ownership",
+            "Check if ConfigMap/Secret was updated recently"
+          ],
+          "common_causes": [
+            "ConfigMap/Secret not found in namespace",
+            "Incorrect volume mount path",
+            "Missing volume definition in pod spec",
+            "Insufficient permissions",
+            "ConfigMap/Secret key mismatches"
+          ]
+        },
+        "resolution_steps": [
+          {
+            "step": 1,
+            "action": "Check ConfigMap/Secret exists",
+            "command": "kubectl get configmap,secret -n <namespace>",
+            "expected_output": "Lists available ConfigMaps and Secrets"
+          },
+          {
+            "step": 2,
+            "action": "Describe pod configuration",
+            "command": "kubectl describe pod <pod-name> -n <namespace>",
+            "expected_output": "Shows volume mounts and events"
+          },
+          {
+            "step": 3,
+            "action": "Check mounted files",
+            "command": "kubectl exec -it <pod-name> -- ls -la <mount-path>",
+            "expected_output": "Shows mounted ConfigMap/Secret files"
+          },
+          {
+            "step": 4,
+            "action": "Verify ConfigMap content",
+            "command": "kubectl get configmap <configmap-name> -o yaml -n <namespace>",
+            "expected_output": "Shows ConfigMap data and keys"
+          },
+          {
+            "step": 5,
+            "action": "Restart deployment to remount",
+            "command": "kubectl rollout restart deployment <deployment-name> -n <namespace>",
+            "expected_output": "Deployment restarted with updated mounts"
+          }
+        ],
+        "prevention": [
+          "Use consistent naming conventions",
+          "Implement configuration validation",
+          "Monitor ConfigMap/Secret changes",
+          "Document configuration dependencies"
+        ]
+      },
+      {
+        "id": "K8S-008",
+        "title": "Node NotReady Status",
+        "severity": "Critical",
+        "category": "Infrastructure",
+        "description": "Kubernetes nodes become unavailable causing pod evictions and capacity issues",
+        "symptoms": [
+          "Node status shows NotReady",
+          "Pods being evicted from affected nodes",
+          "Reduced cluster capacity",
+          "New pods not scheduling to node"
+        ],
+        "root_cause_analysis": {
+          "primary_cause": "Node health issues or kubelet problems",
+          "investigation_steps": [
+            "Check node conditions and status",
+            "Examine kubelet logs on affected node",
+            "Verify node resource availability",
+            "Check network connectivity to control plane",
+            "Investigate system-level issues on node"
+          ],
+          "common_causes": [
+            "Kubelet service failure",
+            "Network connectivity issues",
+            "Disk space exhaustion",
+            "High memory pressure",
+            "Container runtime problems"
+          ]
+        },
+        "resolution_steps": [
+          {
+            "step": 1,
+            "action": "Check node status",
+            "command": "kubectl describe node <node-name>",
+            "expected_output": "Shows node conditions and recent events"
+          },
+          {
+            "step": 2,
+            "action": "SSH to node and check kubelet",
+            "command": "ssh <node> && sudo systemctl status kubelet",
+            "expected_output": "Shows kubelet service status"
+          },
+          {
+            "step": 3,
+            "action": "Check kubelet logs",
+            "command": "sudo journalctl -u kubelet -f",
+            "expected_output": "Shows kubelet logs for debugging"
+          },
+          {
+            "step": 4,
+            "action": "Restart kubelet service",
+            "command": "sudo systemctl restart kubelet",
+            "expected_output": "Kubelet service restarted"
+          },
+          {
+            "step": 5,
+            "action": "Verify node recovery",
+            "command": "kubectl get nodes -w",
+            "expected_output": "Node status changes to Ready"
+          }
+        ],
+        "prevention": [
+          "Monitor node health metrics",
+          "Implement automated node recovery",
+          "Regular system maintenance",
+          "Capacity planning and monitoring"
+        ]
+      }
+    ]
+  }

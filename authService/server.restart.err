@@ -1,0 +1,696 @@
+(node:11044) [MONGOOSE] Warning: Duplicate schema index on {"createdAt":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:11044) [MONGOOSE] Warning: Duplicate schema index on {"key_hash":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:11044) [MONGOOSE] Warning: Duplicate schema index on {"createdAt":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:11044) [MONGOOSE] Warning: `collection` is a reserved schema pathname and may break some functionality. You are allowed to use it, but use at your own risk. To disable this warning pass `suppressReservedKeysWarning` as a schema option.
+(node:11044) [MONGOOSE] Warning: `collection` is a reserved schema pathname and may break some functionality. You are allowed to use it, but use at your own risk. To disable this warning pass `suppressReservedKeysWarning` as a schema option.
+(node:11044) [MONGOOSE] Warning: Duplicate schema index on {"timestamp":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+[AgentOps Sync] Failed to sync user: {
+  email: 'pavan@wipro.com',
+  error: 'Error',
+  status: undefined,
+  data: undefined
+}
+[AgentOps Sync] Failed to sync user: {
+  email: 'ayyppan.kaliyamoorthy@wipro.com',
+  error: 'Error',
+  status: undefined,
+  data: undefined
+}
+Complete onboarding error: ValidationError: Cluster validation failed: clusterType: `azure` is not a valid enum value for path `clusterType`.
+    at Document.invalidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3370:32)
+    at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3145:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Promise.all (index 2)
+    at async model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3086:3)
+    at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+    at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+    at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+    at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+    at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5) {
+  errors: {
+    clusterType: ValidatorError: `azure` is not a valid enum value for path `clusterType`.
+        at SchemaString.doValidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\schemaType.js:1425:13)
+        at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3137:24)
+        at model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3083:21)
+        at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+        at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+        at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+        at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+        at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+        at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5)
+        at async E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:2722:9 {
+      properties: [Object],
+      kind: 'enum',
+      path: 'clusterType',
+      value: 'azure',
+      reason: undefined,
+      [Symbol(mongoose#validatorError)]: true
+    }
+  },
+  _message: 'Cluster validation failed'
+}
+Complete onboarding error: ValidationError: Cluster validation failed: clusterType: `azure` is not a valid enum value for path `clusterType`.
+    at Document.invalidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3370:32)
+    at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3145:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Promise.all (index 2)
+    at async model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3086:3)
+    at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+    at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+    at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+    at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+    at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5) {
+  errors: {
+    clusterType: ValidatorError: `azure` is not a valid enum value for path `clusterType`.
+        at SchemaString.doValidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\schemaType.js:1425:13)
+        at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3137:24)
+        at model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3083:21)
+        at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+        at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+        at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+        at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+        at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+        at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5)
+        at async E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:2722:9 {
+      properties: [Object],
+      kind: 'enum',
+      path: 'clusterType',
+      value: 'azure',
+      reason: undefined,
+      [Symbol(mongoose#validatorError)]: true
+    }
+  },
+  _message: 'Cluster validation failed'
+}
+Complete onboarding error: ValidationError: Cluster validation failed: clusterType: `azure` is not a valid enum value for path `clusterType`.
+    at Document.invalidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3370:32)
+    at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3145:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Promise.all (index 2)
+    at async model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3086:3)
+    at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+    at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+    at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+    at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+    at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5) {
+  errors: {
+    clusterType: ValidatorError: `azure` is not a valid enum value for path `clusterType`.
+        at SchemaString.doValidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\schemaType.js:1425:13)
+        at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3137:24)
+        at model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3083:21)
+        at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+        at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+        at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+        at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+        at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+        at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5)
+        at async E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:2722:9 {
+      properties: [Object],
+      kind: 'enum',
+      path: 'clusterType',
+      value: 'azure',
+      reason: undefined,
+      [Symbol(mongoose#validatorError)]: true
+    }
+  },
+  _message: 'Cluster validation failed'
+}
+Complete onboarding error: ValidationError: Cluster validation failed: clusterType: `azure` is not a valid enum value for path `clusterType`.
+    at Document.invalidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3370:32)
+    at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3145:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Promise.all (index 2)
+    at async model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3086:3)
+    at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+    at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+    at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+    at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+    at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5) {
+  errors: {
+    clusterType: ValidatorError: `azure` is not a valid enum value for path `clusterType`.
+        at SchemaString.doValidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\schemaType.js:1425:13)
+        at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3137:24)
+        at model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3083:21)
+        at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+        at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+        at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+        at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+        at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+        at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5)
+        at async E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:2722:9 {
+      properties: [Object],
+      kind: 'enum',
+      path: 'clusterType',
+      value: 'azure',
+      reason: undefined,
+      [Symbol(mongoose#validatorError)]: true
+    }
+  },
+  _message: 'Cluster validation failed'
+}
+Complete onboarding error: ValidationError: Cluster validation failed: clusterType: `azure` is not a valid enum value for path `clusterType`.
+    at Document.invalidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3370:32)
+    at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3145:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Promise.all (index 2)
+    at async model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3086:3)
+    at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+    at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+    at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+    at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+    at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5) {
+  errors: {
+    clusterType: ValidatorError: `azure` is not a valid enum value for path `clusterType`.
+        at SchemaString.doValidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\schemaType.js:1425:13)
+        at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3137:24)
+        at model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3083:21)
+        at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+        at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+        at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+        at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+        at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+        at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5)
+        at async E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:2722:9 {
+      properties: [Object],
+      kind: 'enum',
+      path: 'clusterType',
+      value: 'azure',
+      reason: undefined,
+      [Symbol(mongoose#validatorError)]: true
+    }
+  },
+  _message: 'Cluster validation failed'
+}
+Complete onboarding error: ValidationError: Cluster validation failed: clusterType: `azure` is not a valid enum value for path `clusterType`.
+    at Document.invalidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3370:32)
+    at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3145:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Promise.all (index 2)
+    at async model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3086:3)
+    at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+    at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+    at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+    at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+    at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5) {
+  errors: {
+    clusterType: ValidatorError: `azure` is not a valid enum value for path `clusterType`.
+        at SchemaString.doValidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\schemaType.js:1425:13)
+        at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3137:24)
+        at model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3083:21)
+        at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+        at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+        at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+        at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+        at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+        at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5)
+        at async E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:2722:9 {
+      properties: [Object],
+      kind: 'enum',
+      path: 'clusterType',
+      value: 'azure',
+      reason: undefined,
+      [Symbol(mongoose#validatorError)]: true
+    }
+  },
+  _message: 'Cluster validation failed'
+}
+Complete onboarding error: ValidationError: Cluster validation failed: clusterType: `azure` is not a valid enum value for path `clusterType`.
+    at Document.invalidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3370:32)
+    at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3145:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Promise.all (index 2)
+    at async model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3086:3)
+    at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+    at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+    at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+    at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+    at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5) {
+  errors: {
+    clusterType: ValidatorError: `azure` is not a valid enum value for path `clusterType`.
+        at SchemaString.doValidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\schemaType.js:1425:13)
+        at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3137:24)
+        at model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3083:21)
+        at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+        at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+        at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+        at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+        at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+        at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5)
+        at async E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:2722:9 {
+      properties: [Object],
+      kind: 'enum',
+      path: 'clusterType',
+      value: 'azure',
+      reason: undefined,
+      [Symbol(mongoose#validatorError)]: true
+    }
+  },
+  _message: 'Cluster validation failed'
+}
+Complete onboarding error: ValidationError: Cluster validation failed: clusterType: `azure` is not a valid enum value for path `clusterType`.
+    at Document.invalidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3370:32)
+    at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3145:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Promise.all (index 2)
+    at async model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3086:3)
+    at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+    at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+    at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+    at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+    at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5) {
+  errors: {
+    clusterType: ValidatorError: `azure` is not a valid enum value for path `clusterType`.
+        at SchemaString.doValidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\schemaType.js:1425:13)
+        at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3137:24)
+        at model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3083:21)
+        at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+        at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+        at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+        at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+        at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+        at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5)
+        at async E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:2722:9 {
+      properties: [Object],
+      kind: 'enum',
+      path: 'clusterType',
+      value: 'azure',
+      reason: undefined,
+      [Symbol(mongoose#validatorError)]: true
+    }
+  },
+  _message: 'Cluster validation failed'
+}
+Complete onboarding error: ValidationError: Cluster validation failed: clusterType: `azure` is not a valid enum value for path `clusterType`.
+    at Document.invalidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3370:32)
+    at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3145:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Promise.all (index 2)
+    at async model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3086:3)
+    at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+    at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+    at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+    at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+    at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5) {
+  errors: {
+    clusterType: ValidatorError: `azure` is not a valid enum value for path `clusterType`.
+        at SchemaString.doValidate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\schemaType.js:1425:13)
+        at validatePath (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3137:24)
+        at model.$__validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:3083:21)
+        at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+        at async model.validate (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\document.js:2663:5)
+        at async model.validateBeforeSave (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\plugins\validateBeforeSave.js:34:7)
+        at async Kareem.execPre (E:\DevopsCopilot-\authService\node_modules\kareem\index.js:65:24)
+        at async model.$__save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:369:5)
+        at async model.save (E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:609:5)
+        at async E:\DevopsCopilot-\authService\node_modules\mongoose\lib\model.js:2722:9 {
+      properties: [Object],
+      kind: 'enum',
+      path: 'clusterType',
+      value: 'azure',
+      reason: undefined,
+      [Symbol(mongoose#validatorError)]: true
+    }
+  },
+  _message: 'Cluster validation failed'
+}
+Error fetching agents: AxiosError [AggregateError]: Error
+    at AxiosError.from (E:\DevopsCopilot-\authService\node_modules\axios\dist\node\axios.cjs:914:14)
+    at RedirectableRequest.handleRequestError (E:\DevopsCopilot-\authService\node_modules\axios\dist\node\axios.cjs:3515:25)
+    at RedirectableRequest.emit (node:events:514:28)
+    at eventHandlers.<computed> (E:\DevopsCopilot-\authService\node_modules\follow-redirects\index.js:49:24)
+    at ClientRequest.emit (node:events:514:28)
+    at Socket.socketErrorListener (node:_http_client:495:9)
+    at Socket.emit (node:events:514:28)
+    at emitErrorNT (node:internal/streams/destroy:151:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:116:3)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21)
+    at Axios.request (E:\DevopsCopilot-\authService\node_modules\axios\dist\node\axios.cjs:4731:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async E:\DevopsCopilot-\authService\api\agentopsRoutes.js:469:22 {
+  code: 'ECONNREFUSED',
+  errors: [
+    Error: connect ECONNREFUSED ::1:8000
+        at createConnectionError (node:net:1634:14)
+        at afterConnectMultiple (node:net:1664:40) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 8000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:8000
+        at createConnectionError (node:net:1634:14)
+        at afterConnectMultiple (node:net:1664:40) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8000
+    }
+  ],
+  config: {
+    transitional: {
+      silentJSONParsing: true,
+      forcedJSONParsing: true,
+      clarifyTimeoutError: false
+    },
+    adapter: [ 'xhr', 'http', 'fetch' ],
+    transformRequest: [ [Function: transformRequest] ],
+    transformResponse: [ [Function: transformResponse] ],
+    timeout: 0,
+    xsrfCookieName: 'XSRF-TOKEN',
+    xsrfHeaderName: 'X-XSRF-TOKEN',
+    maxContentLength: -1,
+    maxBodyLength: -1,
+    env: { FormData: [Function], Blob: [class Blob] },
+    validateStatus: [Function: validateStatus],
+    headers: Object [AxiosHeaders] {
+      Accept: 'application/json, text/plain, */*',
+      'Content-Type': undefined,
+      Authorization: 'Bearer dev-service-token-12345',
+      'User-Agent': 'axios/1.13.2',
+      'Accept-Encoding': 'gzip, compress, deflate, br'
+    },
+    params: { user_id: '6abd4236ba64f6217532903b' },
+    method: 'get',
+    url: 'http://localhost:8000/api/v1/agents',
+    allowAbsoluteUrls: true,
+    data: undefined
+  },
+  request: <ref *1> Writable {
+    _writableState: WritableState {
+      state: 802924,
+      highWaterMark: 16384,
+      defaultEncoding: 'utf8',
+      length: 0,
+      corked: 0,
+      onwrite: [Function: bound onwrite],
+      writecb: null,
+      writelen: 0,
+      afterWriteTickInfo: null,
+      buffered: [],
+      bufferedIndex: 0,
+      pendingcb: 0,
+      errored: null,
+      [Symbol(kOnFinished)]: []
+    },
+    _events: [Object: null prototype] {
+      response: [Function: handleResponse],
+      error: [Function: handleRequestError],
+      socket: [Array]
+    },
+    _eventsCount: 3,
+    _maxListeners: undefined,
+    _options: {
+      maxRedirects: 21,
+      maxBodyLength: Infinity,
+      protocol: 'http:',
+      path: '/api/v1/agents?user_id=6abd4236ba64f6217532903b',
+      method: 'GET',
+      headers: [Object: null prototype],
+      agents: [Object],
+      auth: undefined,
+      family: undefined,
+      beforeRedirect: [Function: dispatchBeforeRedirect],
+      beforeRedirects: [Object],
+      http2Options: undefined,
+      hostname: 'localhost',
+      port: '8000',
+      agent: undefined,
+      nativeProtocols: [Object],
+      pathname: '/api/v1/agents',
+      search: '?user_id=6abd4236ba64f6217532903b'
+    },
+    _ended: true,
+    _ending: true,
+    _redirectCount: 0,
+    _redirects: [],
+    _requestBodyLength: 0,
+    _requestBodyBuffers: [],
+    _onNativeResponse: [Function (anonymous)],
+    _currentRequest: ClientRequest {
+      _events: [Object: null prototype],
+      _eventsCount: 7,
+      _maxListeners: undefined,
+      outputData: [],
+      outputSize: 0,
+      writable: true,
+      destroyed: false,
+      _last: true,
+      chunkedEncoding: false,
+      shouldKeepAlive: true,
+      maxRequestsOnConnectionReached: false,
+      _defaultKeepAlive: true,
+      useChunkedEncodingByDefault: false,
+      sendDate: false,
+      _removedConnection: false,
+      _removedContLen: false,
+      _removedTE: false,
+      strictContentLength: false,
+      _contentLength: 0,
+      _hasBody: true,
+      _trailer: '',
+      finished: true,
+      _headerSent: true,
+      _closed: false,
+      socket: [Socket],
+      _header: 'GET /api/v1/agents?user_id=6abd4236ba64f6217532903b HTTP/1.1\r\n' +
+        'Accept: application/json, text/plain, */*\r\n' +
+        'Authorization: Bearer dev-service-token-12345\r\n' +
+        'User-Agent: axios/1.13.2\r\n' +
+        'Accept-Encoding: gzip, compress, deflate, br\r\n' +
+        'Host: localhost:8000\r\n' +
+        'Connection: keep-alive\r\n' +
+        '\r\n',
+      _keepAliveTimeout: 0,
+      _onPendingData: [Function: nop],
+      agent: [Agent],
+      socketPath: undefined,
+      method: 'GET',
+      maxHeaderSize: undefined,
+      insecureHTTPParser: undefined,
+      joinDuplicateHeaders: undefined,
+      path: '/api/v1/agents?user_id=6abd4236ba64f6217532903b',
+      _ended: false,
+      res: null,
+      aborted: false,
+      timeoutCb: [Function: emitRequestTimeout],
+      upgradeOrConnect: false,
+      parser: null,
+      maxHeadersCount: null,
+      reusedSocket: false,
+      host: 'localhost',
+      protocol: 'http:',
+      _redirectable: [Circular *1],
+      [Symbol(kCapture)]: false,
+      [Symbol(kBytesWritten)]: 0,
+      [Symbol(kNeedDrain)]: false,
+      [Symbol(corked)]: 0,
+      [Symbol(kOutHeaders)]: [Object: null prototype],
+      [Symbol(errored)]: null,
+      [Symbol(kHighWaterMark)]: 16384,
+      [Symbol(kRejectNonStandardBodyWrites)]: false,
+      [Symbol(kUniqueHeaders)]: null
+    },
+    _currentUrl: 'http://localhost:8000/api/v1/agents?user_id=6abd4236ba64f6217532903b',
+    _timeout: null,
+    [Symbol(kCapture)]: false
+  },
+  [cause]: AggregateError
+      at internalConnectMultiple (node:net:1114:18)
+      at afterConnectMultiple (node:net:1667:5) {
+    code: 'ECONNREFUSED',
+    [errors]: [ [Error], [Error] ]
+  }
+}
+Error fetching agents: AxiosError [AggregateError]: Error
+    at AxiosError.from (E:\DevopsCopilot-\authService\node_modules\axios\dist\node\axios.cjs:914:14)
+    at RedirectableRequest.handleRequestError (E:\DevopsCopilot-\authService\node_modules\axios\dist\node\axios.cjs:3515:25)
+    at RedirectableRequest.emit (node:events:514:28)
+    at eventHandlers.<computed> (E:\DevopsCopilot-\authService\node_modules\follow-redirects\index.js:49:24)
+    at ClientRequest.emit (node:events:514:28)
+    at Socket.socketErrorListener (node:_http_client:495:9)
+    at Socket.emit (node:events:514:28)
+    at emitErrorNT (node:internal/streams/destroy:151:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:116:3)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21)
+    at Axios.request (E:\DevopsCopilot-\authService\node_modules\axios\dist\node\axios.cjs:4731:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async E:\DevopsCopilot-\authService\api\agentopsRoutes.js:469:22 {
+  code: 'ECONNREFUSED',
+  errors: [
+    Error: connect ECONNREFUSED ::1:8000
+        at createConnectionError (node:net:1634:14)
+        at afterConnectMultiple (node:net:1664:40) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 8000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:8000
+        at createConnectionError (node:net:1634:14)
+        at afterConnectMultiple (node:net:1664:40) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8000
+    }
+  ],
+  config: {
+    transitional: {
+      silentJSONParsing: true,
+      forcedJSONParsing: true,
+      clarifyTimeoutError: false
+    },
+    adapter: [ 'xhr', 'http', 'fetch' ],
+    transformRequest: [ [Function: transformRequest] ],
+    transformResponse: [ [Function: transformResponse] ],
+    timeout: 0,
+    xsrfCookieName: 'XSRF-TOKEN',
+    xsrfHeaderName: 'X-XSRF-TOKEN',
+    maxContentLength: -1,
+    maxBodyLength: -1,
+    env: { FormData: [Function], Blob: [class Blob] },
+    validateStatus: [Function: validateStatus],
+    headers: Object [AxiosHeaders] {
+      Accept: 'application/json, text/plain, */*',
+      'Content-Type': undefined,
+      Authorization: 'Bearer dev-service-token-12345',
+      'User-Agent': 'axios/1.13.2',
+      'Accept-Encoding': 'gzip, compress, deflate, br'
+    },
+    params: { user_id: '6abd4236ba64f6217532903b' },
+    method: 'get',
+    url: 'http://localhost:8000/api/v1/agents',
+    allowAbsoluteUrls: true,
+    data: undefined
+  },
+  request: <ref *1> Writable {
+    _writableState: WritableState {
+      state: 802924,
+      highWaterMark: 16384,
+      defaultEncoding: 'utf8',
+      length: 0,
+      corked: 0,
+      onwrite: [Function: bound onwrite],
+      writecb: null,
+      writelen: 0,
+      afterWriteTickInfo: null,
+      buffered: [],
+      bufferedIndex: 0,
+      pendingcb: 0,
+      errored: null,
+      [Symbol(kOnFinished)]: []
+    },
+    _events: [Object: null prototype] {
+      response: [Function: handleResponse],
+      error: [Function: handleRequestError],
+      socket: [Array]
+    },
+    _eventsCount: 3,
+    _maxListeners: undefined,
+    _options: {
+      maxRedirects: 21,
+      maxBodyLength: Infinity,
+      protocol: 'http:',
+      path: '/api/v1/agents?user_id=6abd4236ba64f6217532903b',
+      method: 'GET',
+      headers: [Object: null prototype],
+      agents: [Object],
+      auth: undefined,
+      family: undefined,
+      beforeRedirect: [Function: dispatchBeforeRedirect],
+      beforeRedirects: [Object],
+      http2Options: undefined,
+      hostname: 'localhost',
+      port: '8000',
+      agent: undefined,
+      nativeProtocols: [Object],
+      pathname: '/api/v1/agents',
+      search: '?user_id=6abd4236ba64f6217532903b'
+    },
+    _ended: true,
+    _ending: true,
+    _redirectCount: 0,
+    _redirects: [],
+    _requestBodyLength: 0,
+    _requestBodyBuffers: [],
+    _onNativeResponse: [Function (anonymous)],
+    _currentRequest: ClientRequest {
+      _events: [Object: null prototype],
+      _eventsCount: 7,
+      _maxListeners: undefined,
+      outputData: [],
+      outputSize: 0,
+      writable: true,
+      destroyed: false,
+      _last: true,
+      chunkedEncoding: false,
+      shouldKeepAlive: true,
+      maxRequestsOnConnectionReached: false,
+      _defaultKeepAlive: true,
+      useChunkedEncodingByDefault: false,
+      sendDate: false,
+      _removedConnection: false,
+      _removedContLen: false,
+      _removedTE: false,
+      strictContentLength: false,
+      _contentLength: 0,
+      _hasBody: true,
+      _trailer: '',
+      finished: true,
+      _headerSent: true,
+      _closed: false,
+      socket: [Socket],
+      _header: 'GET /api/v1/agents?user_id=6abd4236ba64f6217532903b HTTP/1.1\r\n' +
+        'Accept: application/json, text/plain, */*\r\n' +
+        'Authorization: Bearer dev-service-token-12345\r\n' +
+        'User-Agent: axios/1.13.2\r\n' +
+        'Accept-Encoding: gzip, compress, deflate, br\r\n' +
+        'Host: localhost:8000\r\n' +
+        'Connection: keep-alive\r\n' +
+        '\r\n',
+      _keepAliveTimeout: 0,
+      _onPendingData: [Function: nop],
+      agent: [Agent],
+      socketPath: undefined,
+      method: 'GET',
+      maxHeaderSize: undefined,
+      insecureHTTPParser: undefined,
+      joinDuplicateHeaders: undefined,
+      path: '/api/v1/agents?user_id=6abd4236ba64f6217532903b',
+      _ended: false,
+      res: null,
+      aborted: false,
+      timeoutCb: [Function: emitRequestTimeout],
+      upgradeOrConnect: false,
+      parser: null,
+      maxHeadersCount: null,
+      reusedSocket: false,
+      host: 'localhost',
+      protocol: 'http:',
+      _redirectable: [Circular *1],
+      [Symbol(kCapture)]: false,
+      [Symbol(kBytesWritten)]: 0,
+      [Symbol(kNeedDrain)]: false,
+      [Symbol(corked)]: 0,
+      [Symbol(kOutHeaders)]: [Object: null prototype],
+      [Symbol(errored)]: null,
+      [Symbol(kHighWaterMark)]: 16384,
+      [Symbol(kRejectNonStandardBodyWrites)]: false,
+      [Symbol(kUniqueHeaders)]: null
+    },
+    _currentUrl: 'http://localhost:8000/api/v1/agents?user_id=6abd4236ba64f6217532903b',
+    _timeout: null,
+    [Symbol(kCapture)]: false
+  },
+  [cause]: AggregateError
+      at internalConnectMultiple (node:net:1114:18)
+      at afterConnectMultiple (node:net:1667:5) {
+    code: 'ECONNREFUSED',
+    [errors]: [ [Error], [Error] ]
+  }
+}

@@ -1,0 +1,22 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "devopscopilot.prometheus.fullname" . }}
+  labels:
+    {{- include "devopscopilot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+spec:
+  type: {{ .Values.monitoring.prometheus.service.type }}
+  selector:
+    {{- include "devopscopilot.agent.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+  ports:
+    - name: http
+      port: {{ .Values.monitoring.prometheus.service.port }}
+      targetPort: 9090
+      protocol: TCP
+      {{- if and (eq .Values.monitoring.prometheus.service.type "NodePort") .Values.monitoring.prometheus.service.nodePort }}
+      nodePort: {{ .Values.monitoring.prometheus.service.nodePort }}
+      {{- end }}
+{{- end }}

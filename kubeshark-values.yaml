@@ -1,0 +1,35 @@
+tap:
+  release:
+    namespace: kubeshark
+  namespaces: []
+  capture:
+    dissection:
+      enabled: true
+      stopAfter: "0"
+    captureSelf: false
+  tls: true
+  hostNetwork: true
+  resources:
+    hub:
+      limits:
+        cpu: "1"
+        memory: 2Gi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    sniffer:
+      limits:
+        cpu: "500m"
+        memory: 1Gi
+      requests:
+        cpu: 50m
+        memory: 128Mi
+    tracer:
+      limits:
+        cpu: "500m"
+        memory: 1Gi
+      requests:
+        cpu: 50m
+        memory: 128Mi
+headless: true
+logLevel: info

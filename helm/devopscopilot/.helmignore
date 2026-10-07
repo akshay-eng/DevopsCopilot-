@@ -1,0 +1,6 @@
+.DS_Store
+*.md
+build-and-push.sh
+.git
+.gitignore
+*.tmp

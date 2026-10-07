@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "devopscopilot.fullname" . }}-agent
+  labels:
+    {{- include "devopscopilot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cluster-agent
+data:
+  CLUSTER_NAME: {{ .Values.config.clusterName | quote }}
+  KAFKA_BOOTSTRAP_SERVERS: {{ .Values.config.kafkaBootstrapServers | quote }}
+  BACKEND_URL: {{ .Values.config.backendUrl | quote }}
+  PROMETHEUS_URL: {{ include "devopscopilot.effectivePrometheusUrl" . | quote }}
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  WATCH_INTERVAL: {{ .Values.config.watchInterval | quote }}
+  HEARTBEAT_INTERVAL: {{ .Values.config.heartbeatInterval | quote }}
+  METRICS_INTERVAL: {{ .Values.config.metricsInterval | quote }}

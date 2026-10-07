@@ -1,0 +1,275 @@
+/**
+ * DevOps Copilot Theme Override for AgentOps Dashboard
+ *
+ * This stylesheet overrides AgentOps default blue theme with
+ * DevOps Copilot's purple/violet gradient theme
+ */
+
+/* Apply theme overrides when data-theme="devops-copilot" attribute is present */
+[data-theme="devops-copilot"] {
+  /* Override CSS Variables for Light Mode */
+  --primary: 262 80% 50%;  /* Purple-500 */
+  --primary-foreground: 262 80% 98%;
+
+  --secondary: 258 90% 66%;  /* Violet-500 */
+  --secondary-foreground: 210 40% 98%;
+
+  --accent: 262 83% 58%;  /* Purple-600 */
+  --accent-foreground: 210 40% 98%;
+
+  --muted: 262 47% 96%;
+  --muted-foreground: 262 16% 47%;
+
+  --border: 262 30% 88%;
+  --input: 262 30% 91%;
+  --ring: 262 80% 50%;
+
+  /* Chart colors - Purple/Violet gradient */
+  --chart-1: 262 80% 50% / 1;  /* Purple primary */
+  --chart-2: 258 90% 66% / 1;  /* Violet primary */
+  --chart-3: 262 80% 50% / 0.6;  /* Purple muted */
+  --chart-4: 258 90% 66% / 0.5;  /* Violet muted */
+
+  /* Background adjustments */
+  --background: 0 0% 100%;
+  --primary-container: 262 100% 98%;
+}
+
+/* Dark mode theme overrides */
+[data-theme="devops-copilot"].dark {
+  --background: 222 84% 5%;  /* Dark background matching DevOps Copilot */
+  --foreground: 210 40% 98%;
+
+  --primary: 262 80% 60%;  /* Lighter purple for dark mode */
+  --primary-foreground: 210 40% 98%;
+
+  --secondary: 258 90% 70%;  /* Lighter violet for dark mode */
+  --secondary-foreground: 210 40% 98%;
+
+  --accent: 262 83% 65%;
+  --accent-foreground: 210 40% 98%;
+
+  --muted: 262 30% 15%;
+  --muted-foreground: 262 20% 65%;
+
+  --card: 222 84% 5%;
+  --card-foreground: 210 40% 98%;
+
+  --popover: 222 84% 5%;
+  --popover-foreground: 210 40% 98%;
+
+  --border: 262 30% 18%;
+  --input: 262 30% 18%;
+  --ring: 262 80% 60%;
+}
+
+/* Override gradient buttons to use purple/violet */
+[data-theme="devops-copilot"] .animated-gradient-border::before {
+  background: linear-gradient(
+    120deg,
+    #a855f7,  /* Purple-500 */
+    #8b5cf6,  /* Violet-500 */
+    #a855f7,
+    #c084fc,  /* Purple-400 */
+    #a78bfa,  /* Violet-400 */
+    #a855f7
+  );
+  background-size: 200% 200%;
+  animation: gradient-border-move 3s linear infinite;
+}
+
+/* Override rainbow gradient with purple/violet gradient */
+[data-theme="devops-copilot"] .rainbow-gradient {
+  background: linear-gradient(
+    90deg,
+    #a855f7,  /* Purple-500 */
+    #8b5cf6,  /* Violet-500 */
+    #c084fc,  /* Purple-400 */
+    #a78bfa,  /* Violet-400 */
+    #7c3aed,  /* Violet-600 */
+    #a855f7
+  );
+  background-size: 400% 400%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: rainbow-move 2s linear infinite;
+}
+
+/* Button overrides - Replace blue with purple/violet */
+[data-theme="devops-copilot"] button[class*="bg-blue"],
+[data-theme="devops-copilot"] .bg-blue-500,
+[data-theme="devops-copilot"] .bg-blue-600 {
+  background-color: hsl(262 80% 50%) !important;  /* Purple-500 */
+}
+
+[data-theme="devops-copilot"] button[class*="bg-blue"]:hover,
+[data-theme="devops-copilot"] .hover\:bg-blue-600:hover,
+[data-theme="devops-copilot"] .hover\:bg-blue-700:hover {
+  background-color: hsl(262 83% 58%) !important;  /* Purple-600 */
+}
+
+/* Border color overrides */
+[data-theme="devops-copilot"] .border-blue-500 {
+  border-color: hsl(262 80% 50%) !important;
+}
+
+[data-theme="devops-copilot"] .border-blue-600 {
+  border-color: hsl(262 83% 58%) !important;
+}
+
+/* Text color overrides */
+[data-theme="devops-copilot"] .text-blue-500 {
+  color: hsl(262 80% 50%) !important;
+}
+
+[data-theme="devops-copilot"] .text-blue-600 {
+  color: hsl(262 83% 58%) !important;
+}
+
+/* Ring color overrides for focus states */
+[data-theme="devops-copilot"] .ring-blue-500 {
+  --tw-ring-color: hsl(262 80% 50%) !important;
+}
+
+/* Gradient backgrounds for primary actions */
+[data-theme="devops-copilot"] .bg-gradient-to-r {
+  background-image: linear-gradient(to right, #a855f7, #8b5cf6) !important;
+}
+
+/* Dark mode specific overrides */
+[data-theme="devops-copilot"].dark .bg-blue-500,
+[data-theme="devops-copilot"].dark .bg-blue-600 {
+  background-color: hsl(258 90% 66%) !important;  /* Violet-500 */
+}
+
+[data-theme="devops-copilot"].dark .bg-blue-700 {
+  background-color: hsl(258 90% 60%) !important;  /* Violet-600 */
+}
+
+/* Primary container background */
+[data-theme="devops-copilot"] .bg-primary-container {
+  background-color: hsl(var(--primary-container));
+}
+
+/* Override specific component classes */
+[data-theme="devops-copilot"] [class*="bg-[#"] {
+  /* For inline hex color overrides, use CSS variables instead */
+  background-color: hsl(var(--primary)) !important;
+}
+
+/* Shimmer effect with purple/violet */
+[data-theme="devops-copilot"] .shimmer-glint {
+  background: linear-gradient(
+    120deg,
+    rgba(168, 85, 247, 0) 0%,      /* Purple transparent */
+    rgba(168, 85, 247, 0.18) 45%,  /* Purple subtle */
+    rgba(139, 92, 246, 0.32) 50%,  /* Violet strong */
+    rgba(168, 85, 247, 0.18) 55%,  /* Purple subtle */
+    rgba(168, 85, 247, 0) 100%     /* Purple transparent */
+  );
+}
+
+/* Success/Warning/Error colors remain unchanged */
+[data-theme="devops-copilot"] .bg-success,
+[data-theme="devops-copilot"] .text-success {
+  /* Keep original success color */
+  color: hsl(var(--success));
+  background-color: hsl(var(--success));
+}
+
+/* Override body background for embedded mode */
+[data-theme="devops-copilot"] body.embedded {
+  background: transparent;
+}
+
+/* Embedded mode adjustments */
+[data-theme="devops-copilot"][data-embedded="true"] {
+  /* Remove padding/margins for seamless iframe integration */
+  --background: transparent;
+}
+
+[data-theme="devops-copilot"][data-embedded="true"] body {
+  background: hsl(var(--background));
+  padding: 0;
+  margin: 0;
+}
+
+/* Link colors */
+[data-theme="devops-copilot"] a {
+  color: hsl(262 80% 50%);
+}
+
+[data-theme="devops-copilot"] a:hover {
+  color: hsl(262 83% 58%);
+}
+
+[data-theme="devops-copilot"].dark a {
+  color: hsl(262 80% 60%);
+}
+
+[data-theme="devops-copilot"].dark a:hover {
+  color: hsl(262 83% 65%);
+}
+
+/* Badge overrides */
+[data-theme="devops-copilot"] .badge-primary {
+  background-color: hsl(262 80% 50% / 0.1);
+  color: hsl(262 80% 50%);
+  border-color: hsl(262 80% 50% / 0.3);
+}
+
+[data-theme="devops-copilot"].dark .badge-primary {
+  background-color: hsl(262 80% 60% / 0.1);
+  color: hsl(262 80% 60%);
+  border-color: hsl(262 80% 60% / 0.3);
+}
+
+/* Chart/Graph colors for consistency */
+[data-theme="devops-copilot"] .recharts-line,
+[data-theme="devops-copilot"] .recharts-area {
+  stroke: hsl(262 80% 50%);
+}
+
+[data-theme="devops-copilot"] .recharts-bar {
+  fill: hsl(262 80% 50%);
+}
+
+/* Tooltip backgrounds */
+[data-theme="devops-copilot"] .tooltip {
+  background-color: hsl(262 83% 58%);
+  color: white;
+}
+
+/* Focus ring colors */
+[data-theme="devops-copilot"] *:focus-visible {
+  outline-color: hsl(262 80% 50%);
+  box-shadow: 0 0 0 2px hsl(262 80% 50% / 0.3);
+}
+
+/* Loading spinner colors */
+[data-theme="devops-copilot"] .spinner,
+[data-theme="devops-copilot"] [class*="animate-spin"] {
+  border-color: hsl(262 80% 50% / 0.2);
+  border-top-color: hsl(262 80% 50%);
+}
+
+/* Progress bar colors */
+[data-theme="devops-copilot"] .progress-bar {
+  background-color: hsl(262 80% 50%);
+}
+
+/* Selection highlight */
+[data-theme="devops-copilot"] ::selection {
+  background-color: hsl(262 80% 50% / 0.3);
+  color: hsl(var(--foreground));
+}
+
+/* Scrollbar styling for dark mode */
+[data-theme="devops-copilot"].dark ::-webkit-scrollbar-thumb {
+  background-color: hsl(262 30% 30%);
+}
+
+[data-theme="devops-copilot"].dark ::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(262 80% 50%);
+}

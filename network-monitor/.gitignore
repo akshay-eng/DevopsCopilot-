@@ -1,0 +1,26 @@
+# Binaries
+bin/
+*.o
+*.out
+
+# Go
+vendor/
+*.test
+*.prof
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated
+vmlinux.h.generated
+*.bpf.o
+
+# Temporary
+tmp/

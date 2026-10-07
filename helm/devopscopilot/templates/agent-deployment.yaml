@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "devopscopilot.fullname" . }}-agent
+  labels:
+    {{- include "devopscopilot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cluster-agent
+spec:
+  replicas: {{ .Values.agent.replicas }}
+  selector:
+    matchLabels:
+      {{- include "devopscopilot.agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "devopscopilot.agent.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Roll the pod when config/secret change.
+        checksum/config: {{ include (print $.Template.BasePath "/agent-configmap.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "devopscopilot.agent.serviceAccountName" . }}
+      {{- with .Values.agent.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.agent.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.agent.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if eq .Values.agent.mode "bundled" }}
+      initContainers:
+        - name: install-deps
+          image: {{ .Values.agent.bundledBaseImage | quote }}
+          command: ["/bin/sh", "-c", "pip install --no-cache-dir -r /code/requirements.txt -t /deps"]
+          volumeMounts:
+            - name: code
+              mountPath: /code
+            - name: deps
+              mountPath: /deps
+      {{- end }}
+      containers:
+        - name: agent
+          {{- if eq .Values.agent.mode "bundled" }}
+          image: {{ .Values.agent.bundledBaseImage | quote }}
+          command: ["python", "/code/app.py"]
+          {{- else }}
+          image: "{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}"
+          imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
+          {{- end }}
+          env:
+            {{- if eq .Values.agent.mode "bundled" }}
+            - name: PYTHONPATH
+              value: /deps
+            {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "devopscopilot.fullname" . }}-agent
+            - secretRef:
+                name: {{ include "devopscopilot.secretName" . }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          {{- if eq .Values.agent.mode "bundled" }}
+          volumeMounts:
+            - name: code
+              mountPath: /code
+            - name: deps
+              mountPath: /deps
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.agent.resources | nindent 12 }}
+      {{- if eq .Values.agent.mode "bundled" }}
+      volumes:
+        - name: code
+          configMap:
+            name: {{ include "devopscopilot.fullname" . }}-agent-code
+        - name: deps
+          emptyDir: {}
+      {{- end }}

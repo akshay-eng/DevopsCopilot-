@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bank-frontend
+  namespace: banking-demo
+  labels:
+    app: bank-frontend
+    tier: frontend
+spec:
+  type: NodePort
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080
+  selector:
+    app: bank-frontend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bank-frontend
+  namespace: banking-demo
+  labels:
+    app: bank-frontend
+    tier: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bank-frontend
+  template:
+    metadata:
+      labels:
+        app: bank-frontend
+        tier: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ak3hay/bank-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "25m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"

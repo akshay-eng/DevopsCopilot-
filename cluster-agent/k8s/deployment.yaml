@@ -1,0 +1,246 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: devopscopilot
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: devopscopilot-agent
+  namespace: devopscopilot
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: devopscopilot-agent
+rules:
+- apiGroups: [""]
+  resources:
+    - pods
+    - pods/log
+    - services
+    - endpoints
+    - persistentvolumeclaims
+    - events
+    - configmaps
+    - secrets
+    - nodes
+    - namespaces
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources:
+    - deployments
+    - daemonsets
+    - replicasets
+    - statefulsets
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources:
+    - jobs
+    - cronjobs
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metrics.k8s.io"]
+  resources:
+    - pods
+    - nodes
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: devopscopilot-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: devopscopilot-agent
+subjects:
+- kind: ServiceAccount
+  name: devopscopilot-agent
+  namespace: devopscopilot
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-agent-config
+  namespace: devopscopilot
+data:
+  CLUSTER_NAME: "k8s-prod"
+  KAFKA_BOOTSTRAP_SERVERS: "kafka-broker-1.kafka.svc.cluster.local:29092,kafka-broker-2.kafka.svc.cluster.local:29093,kafka-broker-3.kafka.svc.cluster.local:29094"
+  PROMETHEUS_URL: "http://172.17.207.51:32738"
+  BACKEND_URL: "http://172.17.204.2:5001"
+  LOG_LEVEL: "INFO"
+  WATCH_INTERVAL: "30"
+  HEARTBEAT_INTERVAL: "60"
+  METRICS_INTERVAL: "120"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cluster-agent-secrets
+  namespace: devopscopilot
+type: Opaque
+stringData:
+  USER_ID: "6a2aab3877fd333c99d683cf"
+  CLUSTER_ID: "6a2fd969f4c38014f5f973d4"
+  KAFKA_USERNAME: ""
+  KAFKA_PASSWORD: ""
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devopscopilot-cluster-agent
+  namespace: devopscopilot
+  labels:
+    app: devopscopilot-cluster-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: devopscopilot-cluster-agent
+  template:
+    metadata:
+      labels:
+        app: devopscopilot-cluster-agent
+    spec:
+      serviceAccountName: devopscopilot-agent
+      initContainers:
+      - name: install-deps
+        image: public.ecr.aws/docker/library/python:3.11-slim
+        command: ["/bin/sh", "-c", "pip install --no-cache-dir -r /code/requirements.txt -t /deps 2>&1"]
+        volumeMounts:
+        - name: code
+          mountPath: /code
+        - name: deps
+          mountPath: /deps
+      containers:
+      - name: agent
+        image: public.ecr.aws/docker/library/python:3.11-slim
+        command: ["python", "/code/app.py"]
+        env:
+        - name: PYTHONPATH
+          value: "/deps"
+        - name: USER_ID
+          valueFrom:
+            secretKeyRef:
+              name: cluster-agent-secrets
+              key: USER_ID
+        - name: CLUSTER_ID
+          valueFrom:
+            secretKeyRef:
+              name: cluster-agent-secrets
+              key: CLUSTER_ID
+        - name: KAFKA_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: cluster-agent-secrets
+              key: KAFKA_USERNAME
+              optional: true
+        - name: KAFKA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cluster-agent-secrets
+              key: KAFKA_PASSWORD
+              optional: true
+        - name: CLUSTER_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-agent-config
+              key: CLUSTER_NAME
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-agent-config
+              key: KAFKA_BOOTSTRAP_SERVERS
+        - name: PROMETHEUS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-agent-config
+              key: PROMETHEUS_URL
+        - name: BACKEND_URL
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-agent-config
+              key: BACKEND_URL
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-agent-config
+              key: LOG_LEVEL
+        - name: WATCH_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-agent-config
+              key: WATCH_INTERVAL
+        - name: HEARTBEAT_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-agent-config
+              key: HEARTBEAT_INTERVAL
+        - name: METRICS_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-agent-config
+              key: METRICS_INTERVAL
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        volumeMounts:
+        - name: code
+          mountPath: /code
+        - name: deps
+          mountPath: /deps
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: code
+        configMap:
+          name: cluster-agent-code
+      - name: deps
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: devopscopilot-cluster-agent
+  namespace: devopscopilot
+  labels:
+    app: devopscopilot-cluster-agent
+spec:
+  type: ClusterIP
+  selector:
+    app: devopscopilot-cluster-agent
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http

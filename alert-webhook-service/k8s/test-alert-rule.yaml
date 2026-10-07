@@ -1,0 +1,23 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: devopscopilot-test-alerts
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: devopscopilot.test
+      interval: 30s
+      rules:
+        # This alert will ALWAYS fire for testing
+        - alert: DevOpsCopilotTest
+          expr: vector(1)  # Always true
+          for: 0s  # Fire immediately
+          labels:
+            severity: info
+            cluster_id: '694b9246e231c5c0be4d8f33'  # Replace with your actual cluster ID
+          annotations:
+            summary: "Test alert for DevOps Copilot webhook"
+            description: "This is a test alert to verify AlertManager webhook integration with the new in-cluster service. It always fires."

@@ -1,0 +1,2 @@
+{"role":"user","content":"What was my favourite namespace? Answer in one short sentence.","userId":"6a2ad8dbf4c38014f5f95b68","at":"2026-09-30T12:32:50.799Z"}
+{"role":"assistant","content":"\n\nI don't have access to your personal history or favorite preferences—we're keeping track of Kubernetes workloads, not user favorites! ☺️","userId":"6a2ad8dbf4c38014f5f95b68","model":"vllm-onprem","at":"2026-09-30T12:32:56.435Z"}

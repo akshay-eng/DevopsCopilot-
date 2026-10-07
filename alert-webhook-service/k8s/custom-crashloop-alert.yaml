@@ -1,0 +1,29 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: devopscopilot-pod-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus  # Required for Prometheus to pick up this rule
+    role: alert-rules
+spec:
+  groups:
+    - name: devopscopilot.pod-alerts
+      interval: 30s  # Evaluate every 30 seconds
+      rules:
+        # Custom KubePodCrashLooping - triggers after 2min, repeats every 2min
+        - alert: KubePodCrashLooping
+          annotations:
+            description: 'Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) is in waiting state (reason: "CrashLoopBackOff") on cluster {{ $labels.cluster }}.'
+            summary: Pod is crash looping.
+            runbook_url: https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubepodcrashlooping
+          expr: |
+            max_over_time(kube_pod_container_status_waiting_reason{
+              reason="CrashLoopBackOff",
+              job="kube-state-metrics",
+              namespace=~".*"
+            }[2m]) >= 1
+          for: 2m  # Fire after 2 minutes in CrashLoopBackOff
+          labels:
+            severity: warning
+            cluster_id: '698b69c2fc1d57cb5b7f091e'  # Your cluster ID for webhook routing

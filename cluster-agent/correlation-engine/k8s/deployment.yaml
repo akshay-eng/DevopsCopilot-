@@ -1,0 +1,140 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: correlation-engine
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: correlation-engine
+rules:
+  # Read pods, services, events
+  - apiGroups: [""]
+    resources: ["pods", "services", "events", "endpoints", "configmaps", "secrets", "namespaces"]
+    verbs: ["get", "list", "watch"]
+
+  # Read pod logs
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+
+  # Read deployments, daemonsets, statefulsets
+  - apiGroups: ["apps"]
+    resources: ["deployments", "daemonsets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+
+  # Read network policies
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: correlation-engine
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: correlation-engine
+subjects:
+  - kind: ServiceAccount
+    name: correlation-engine
+    namespace: default
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: correlation-engine-config
+  namespace: default
+data:
+  # Kafka Configuration
+  KAFKA_BOOTSTRAP_SERVERS: "192.168.1.246:9092,192.168.1.245:9093,192.168.1.240:9094"
+
+  # MongoDB Configuration
+  MONGO_DB_URI: "mongodb://adminuser:password123@192.168.1.251:27017/admin"
+
+  # Prometheus Configuration
+  PROMETHEUS_URL: "http://192.168.1.244:9090"
+
+  # Cluster ID (replace with your cluster ID)
+  CLUSTER_ID: "69518b2339dcb1f682e1c991"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: correlation-engine
+  namespace: default
+  labels:
+    app: correlation-engine
+spec:
+  replicas: 1  # Single instance for now
+  selector:
+    matchLabels:
+      app: correlation-engine
+  template:
+    metadata:
+      labels:
+        app: correlation-engine
+    spec:
+      serviceAccountName: correlation-engine
+      containers:
+        - name: correlation-engine
+          image: ak3hay/correlation-engine:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: correlation-engine-config
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 9000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: correlation-engine
+  namespace: default
+spec:
+  selector:
+    app: correlation-engine
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      port: 9000
+      targetPort: 9000
+      name: http
+---
+# Optional: LoadBalancer for external access
+apiVersion: v1
+kind: Service
+metadata:
+  name: correlation-engine-lb
+  namespace: default
+spec:
+  selector:
+    app: correlation-engine
+  type: LoadBalancer
+  ports:
+    - protocol: TCP
+      port: 9000
+      targetPort: 9000
+      name: http

@@ -1,0 +1,45 @@
+2026-09-30 00:24:02,097 [INFO] __main__: Correlation Engine starting on port 5005
+2026-09-30 00:24:02,121 [INFO] werkzeug: [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5005
+ * Running on http://172.17.204.2:5005
+2026-09-30 00:24:02,122 [INFO] werkzeug: [33mPress CTRL+C to quit[0m
+2026-09-30 00:24:02,463 [INFO] werkzeug: 127.0.0.1 - - [30/Sep/2026 00:24:02] "GET /api/health HTTP/1.1" 200 -
+2026-09-30 00:24:12,455 [INFO] correlator: === Starting correlation for user=6a2ad8dbf4c38014f5f95b68 cluster=None hours=48 ===
+2026-09-30 00:24:12,540 [INFO] data_fetcher: Fetched 500 alerts via authService API for user=6a2ad8dbf4c38014f5f95b68 hours=48
+2026-09-30 00:24:12,772 [INFO] alert_clustering: Clustered 500 alerts into 2 groups
+2026-09-30 00:24:12,774 [INFO] correlator: Found 2 alert clusters from 500 alerts
+2026-09-30 00:24:12,961 [INFO] correlator: Anomaly analysis for N/A: score=0.000 anomalous=False
+2026-09-30 00:24:13,753 [INFO] correlator: Anomaly analysis for kube-proxy-tj29r: score=0.181 anomalous=False
+2026-09-30 00:24:14,312 [INFO] correlator: Anomaly analysis for kube-proxy-cfhw5: score=0.177 anomalous=False
+2026-09-30 00:24:14,889 [INFO] correlator: Anomaly analysis for network-monitor-pgb52: score=0.654 anomalous=True
+2026-09-30 00:24:15,457 [INFO] correlator: Anomaly analysis for kube-scheduler-k8s-controlplane: score=0.236 anomalous=False
+2026-09-30 00:24:16,025 [INFO] correlator: Anomaly analysis for kube-proxy-45kch: score=0.673 anomalous=True
+2026-09-30 00:24:16,578 [INFO] correlator: Anomaly analysis for network-monitor-4dcwq: score=0.181 anomalous=False
+2026-09-30 00:24:17,143 [INFO] correlator: Anomaly analysis for kube-controller-manager-k8s-controlplane: score=0.350 anomalous=True
+2026-09-30 00:24:17,146 [INFO] graph_analysis: Built dependency graph: 0 nodes, 0 edges
+2026-09-30 00:24:17,827 [INFO] correlator: Anomaly analysis for prometheus-prometheus-node-exporter-24f4p: score=0.654 anomalous=True
+2026-09-30 00:24:18,392 [INFO] correlator: Anomaly analysis for prometheus-prometheus-node-exporter-qggz5: score=0.194 anomalous=False
+2026-09-30 00:24:18,958 [INFO] correlator: Anomaly analysis for prometheus-prometheus-node-exporter-2mcgw: score=0.173 anomalous=False
+2026-09-30 00:24:18,961 [INFO] graph_analysis: Built dependency graph: 0 nodes, 0 edges
+2026-09-30 00:24:18,970 [INFO] werkzeug: 127.0.0.1 - - [30/Sep/2026 00:24:18] "POST /api/correlate HTTP/1.1" 200 -
+2026-09-30 00:32:13,598 [INFO] correlator: === Starting correlation for user=6a2ad8dbf4c38014f5f95b68 cluster=6a2af8bff4c38014f5f95c03 hours=6 ===
+2026-09-30 00:32:13,654 [INFO] data_fetcher: Fetched 59 alerts via authService API for user=6a2ad8dbf4c38014f5f95b68 hours=6
+2026-09-30 00:32:13,680 [INFO] correlator: Service map: 10 nodes, 9 links
+2026-09-30 00:32:13,717 [INFO] correlator: Network flows: 200 entries
+2026-09-30 00:32:13,727 [INFO] alert_clustering: Clustered 59 alerts into 2 groups
+2026-09-30 00:32:13,728 [INFO] correlator: Found 2 alert clusters from 59 alerts
+2026-09-30 00:32:13,847 [INFO] correlator: Anomaly analysis for N/A: score=0.000 anomalous=False
+2026-09-30 00:32:14,727 [INFO] correlator: Anomaly analysis for kube-proxy-cfhw5: score=0.140 anomalous=False
+2026-09-30 00:32:15,286 [INFO] correlator: Anomaly analysis for kube-proxy-tj29r: score=0.136 anomalous=False
+2026-09-30 00:32:15,857 [INFO] correlator: Anomaly analysis for network-monitor-pgb52: score=0.553 anomalous=True
+2026-09-30 00:32:16,418 [INFO] correlator: Anomaly analysis for kube-proxy-45kch: score=0.560 anomalous=True
+2026-09-30 00:32:16,980 [INFO] correlator: Anomaly analysis for kube-controller-manager-k8s-controlplane: score=0.262 anomalous=True
+2026-09-30 00:32:17,544 [INFO] correlator: Anomaly analysis for kube-scheduler-k8s-controlplane: score=0.204 anomalous=False
+2026-09-30 00:32:18,116 [INFO] correlator: Anomaly analysis for network-monitor-4dcwq: score=0.130 anomalous=False
+2026-09-30 00:32:18,119 [INFO] graph_analysis: Built dependency graph: 10 nodes, 9 edges
+2026-09-30 00:32:18,825 [INFO] correlator: Anomaly analysis for prometheus-prometheus-node-exporter-qggz5: score=0.141 anomalous=False
+2026-09-30 00:32:19,388 [INFO] correlator: Anomaly analysis for prometheus-prometheus-node-exporter-24f4p: score=0.564 anomalous=True
+2026-09-30 00:32:19,963 [INFO] correlator: Anomaly analysis for prometheus-prometheus-node-exporter-2mcgw: score=0.140 anomalous=False
+2026-09-30 00:32:19,965 [INFO] graph_analysis: Built dependency graph: 10 nodes, 9 edges
+2026-09-30 00:32:19,984 [INFO] werkzeug: 127.0.0.1 - - [30/Sep/2026 00:32:19] "POST /api/correlate HTTP/1.1" 200 -

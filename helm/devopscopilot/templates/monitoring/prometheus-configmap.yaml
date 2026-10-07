@@ -1,0 +1,71 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "devopscopilot.prometheus.fullname" . }}
+  labels:
+    {{- include "devopscopilot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: {{ .Values.monitoring.prometheus.scrapeInterval }}
+      evaluation_interval: {{ .Values.monitoring.prometheus.scrapeInterval }}
+
+    scrape_configs:
+      # Prometheus self-monitoring
+      - job_name: prometheus
+        static_configs:
+          - targets: ["localhost:9090"]
+
+      # Container metrics (container_*) from each kubelet's cAdvisor, via the API server proxy.
+      - job_name: kubelet-cadvisor
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          insecure_skip_verify: true
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+        {{- if .Values.monitoring.prometheus.trimMetrics }}
+        metric_relabel_configs:
+          - source_labels: [__name__]
+            regex: "container_(cpu_usage_seconds_total|cpu_cfs_throttled_seconds_total|memory_working_set_bytes|memory_usage_bytes|spec_memory_limit_bytes|network_receive_bytes_total|network_transmit_bytes_total|fs_reads_bytes_total|fs_writes_bytes_total|fs_usage_bytes)"
+            action: keep
+        {{- end }}
+
+      # kube-state-metrics (kube_* — deployments, pod restarts, pod info)
+      {{- if .Values.monitoring.kubeStateMetrics.enabled }}
+      - job_name: kube-state-metrics
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name]
+            action: keep
+            regex: {{ .Release.Namespace }};{{ include "devopscopilot.fullname" . }}-kube-state-metrics
+      {{- end }}
+
+      # node-exporter (node_* — CPU, memory, disk, network, load, filesystem)
+      {{- if .Values.monitoring.nodeExporter.enabled }}
+      - job_name: node-exporter
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name]
+            action: keep
+            regex: {{ .Release.Namespace }};{{ include "devopscopilot.fullname" . }}-node-exporter
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: node
+          - source_labels: [__meta_kubernetes_endpoint_address_target_name]
+            target_label: instance
+      {{- end }}
+{{- end }}

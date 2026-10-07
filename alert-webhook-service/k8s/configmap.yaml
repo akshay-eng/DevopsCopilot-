@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alert-webhook-config
+  namespace: default
+data:
+  # MongoDB Configuration (using LoadBalancer IP for both in-cluster and external access)
+  MONGO_URI: "mongodb://adminuser:password123@192.168.1.240:27017/admin"
+
+  # Kafka Configuration
+  KAFKA_BROKERS: "192.168.1.246:9092,192.168.1.245:9093,192.168.1.240:9094"
+  KAFKA_CLIENT_ID: "alert-webhook-service"
+  KAFKA_ALERTS_TOPIC: "alerts"
+
+  # Service Configuration
+  PORT: "8080"
+  NODE_ENV: "production"

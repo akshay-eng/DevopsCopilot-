@@ -1,0 +1,6 @@
+agentops
+langchain
+langchain-openai
+langchain-community
+langgraph
+python-dotenv

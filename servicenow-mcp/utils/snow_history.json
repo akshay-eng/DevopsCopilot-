@@ -1,0 +1,183 @@
+[
+    {
+      "title": "CrashLoopBackOff in payment service",
+      "description": "Pod for payment service is restarting repeatedly due to config map error.",
+      "urgency": 2,
+      "impact": 3
+    },
+    {
+      "title": "High CPU in frontend pods",
+      "description": "Frontend deployment in production is consuming high CPU leading to degraded performance.",
+      "urgency": 3,
+      "impact": 2
+    },
+    {
+      "title": "Readiness probe failed in catalog service",
+      "description": "Catalog service pods not passing readiness probe due to slow backend startup.",
+      "urgency": 2,
+      "impact": 2
+    },
+    {
+      "title": "OOMKilled in recommendation engine",
+      "description": "Recommendation engine pods are getting killed due to out of memory errors.",
+      "urgency": 1,
+      "impact": 3
+    },
+    {
+      "title": "ImagePullBackOff in inventory service",
+      "description": "Pods are stuck in ImagePullBackOff due to incorrect image name.",
+      "urgency": 2,
+      "impact": 2
+    },
+    {
+      "title": "Node disk pressure",
+      "description": "Node is under disk pressure causing pod evictions and scheduling failures.",
+      "urgency": 3,
+      "impact": 3
+    },
+    {
+      "title": "Service unreachable in staging namespace",
+      "description": "The internal DNS is not resolving for the analytics service.",
+      "urgency": 2,
+      "impact": 2
+    },
+    {
+      "title": "Pod pending due to unschedulable node",
+      "description": "No node meets the affinity rules defined for backend deployment.",
+      "urgency": 2,
+      "impact": 2
+    },
+    {
+      "title": "PVC stuck in pending",
+      "description": "Persistent volume claim for logging service is pending due to unavailable storage class.",
+      "urgency": 1,
+      "impact": 3
+    },
+    {
+      "title": "Horizontal Pod Autoscaler not scaling",
+      "description": "CPU usage is high but autoscaler for frontend is not increasing replicas.",
+      "urgency": 2,
+      "impact": 2
+    },
+    {
+      "title": "Liveness probe failed in user-api service",
+      "description": "Liveness probe is incorrectly configured, causing frequent restarts.",
+      "urgency": 2,
+      "impact": 2
+    },
+    {
+      "title": "Ingress controller misconfiguration",
+      "description": "Ingress controller is failing to route traffic to backend services due to incorrect annotations.",
+      "urgency": 3,
+      "impact": 2
+    },
+    {
+      "title": "Secrets missing in deployment",
+      "description": "Application is failing to start due to missing secrets in the environment.",
+      "urgency": 2,
+      "impact": 3
+    },
+    {
+      "title": "Node not ready",
+      "description": "Worker node is in NotReady state due to kubelet failure.",
+      "urgency": 3,
+      "impact": 3
+    },
+    {
+      "title": "Evicted pods due to memory pressure",
+      "description": "Multiple pods have been evicted on node-1 due to memory pressure.",
+      "urgency": 2,
+      "impact": 2
+    },
+    {
+      "title": "Kube-proxy not running",
+      "description": "Cluster networking is down due to kube-proxy service failure.",
+      "urgency": 3,
+      "impact": 3
+    },
+    {
+      "title": "CrashLoop in Redis pod",
+      "description": "Redis container crashes due to missing volume mounts.",
+      "urgency": 2,
+      "impact": 3
+    },
+    {
+      "title": "Init container failure in billing service",
+      "description": "Init container is failing due to script timeout in billing service.",
+      "urgency": 1,
+      "impact": 2
+    },
+    {
+      "title": "Container image pull rate limit",
+      "description": "Pods are failing to start due to DockerHub pull rate limit.",
+      "urgency": 2,
+      "impact": 1
+    },
+    {
+      "title": "Kube DNS crashloop",
+      "description": "Kube DNS pods are crashing leading to service resolution failures.",
+      "urgency": 3,
+      "impact": 3
+    },
+    {
+      "title": "Helm release upgrade failed",
+      "description": "Upgrade of shopping-cart helm chart failed due to resource conflict.",
+      "urgency": 2,
+      "impact": 2
+    },
+    {
+      "title": "Cluster autoscaler not removing idle nodes",
+      "description": "Idle nodes are not being scaled down in dev cluster causing resource wastage.",
+      "urgency": 1,
+      "impact": 1
+    },
+    {
+      "title": "Pod security policy violation",
+      "description": "Deployment failed due to disallowed hostPath volume in policy.",
+      "urgency": 2,
+      "impact": 2
+    },
+    {
+      "title": "NetworkPolicy blocking traffic",
+      "description": "NetworkPolicy is overly restrictive and blocking service-to-service communication.",
+      "urgency": 2,
+      "impact": 2
+    },
+    {
+      "title": "HorizontalPodAutoscaler error",
+      "description": "HPA controller logs show error: unable to get metrics for resource.",
+      "urgency": 2,
+      "impact": 1
+    },
+    {
+      "title": "Stuck terminating pods",
+      "description": "Pods are stuck in Terminating state due to finalizer misconfiguration.",
+      "urgency": 1,
+      "impact": 2
+    },
+    {
+      "title": "ConfigMap change not triggering pod restart",
+      "description": "Pods are not picking up new config due to missing checksum annotation.",
+      "urgency": 2,
+      "impact": 1
+    },
+    {
+      "title": "Metrics server unavailable",
+      "description": "HPA and kubectl top not working due to metrics-server being offline.",
+      "urgency": 2,
+      "impact": 1
+    },
+    {
+      "title": "Service load balancer stuck in pending",
+      "description": "LoadBalancer type service not getting external IP due to cloud provider issue.",
+      "urgency": 3,
+      "impact": 2
+    },
+    {
+      "title": "Etcd pod restart",
+      "description": "Etcd pod crashed due to out-of-memory error, affecting control plane stability.",
+      "urgency": 3,
+      "impact": 3
+    }
+  ]
+  

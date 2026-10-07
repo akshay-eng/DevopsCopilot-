@@ -1,0 +1,36 @@
+.timeline-chart-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: #1a1a1a;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.timeline-chart {
+  display: block;
+  background: #1a1a1a;
+}
+
+.timeline-chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  background: #1a1a1a;
+  border-radius: 8px;
+  color: #666;
+  font-size: 14px;
+}
+
+.swimlane.hovered {
+  opacity: 1;
+}
+
+.swimlane:not(.hovered) {
+  opacity: 0.85;
+}
+
+.swimlane:hover {
+  opacity: 1 !important;
+}

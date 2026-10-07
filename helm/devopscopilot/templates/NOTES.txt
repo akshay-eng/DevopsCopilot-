@@ -1,0 +1,35 @@
+✅ {{ .Chart.Name }} installed as "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+Cluster Agent
+  mode:       {{ .Values.agent.mode }}
+  {{- if eq .Values.agent.mode "image" }}
+  image:      {{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}
+  {{- end }}
+  backend:    {{ .Values.config.backendUrl | default "(not set — set config.backendUrl)" }}
+  prometheus: {{ include "devopscopilot.effectivePrometheusUrl" . | default "(not set — set config.prometheusUrl or enable monitoring)" }}
+
+{{- if or (not .Values.secret.userId) (not .Values.secret.clusterId) }}
+
+⚠️  secret.userId / secret.clusterId are empty. The agent needs these (from onboarding)
+    to check in with the backend. Set them:
+      helm upgrade {{ .Release.Name }} <chart> -n {{ .Release.Namespace }} --reuse-values \
+        --set secret.userId=<id> --set secret.clusterId=<id>
+{{- end }}
+
+Monitoring stack: {{ if .Values.monitoring.enabled }}ENABLED{{ else }}disabled{{ end }}
+{{- if .Values.monitoring.enabled }}
+  Prometheus:          {{ include "devopscopilot.prometheus.fullname" . }} (:{{ .Values.monitoring.prometheus.service.port }}, {{ .Values.monitoring.prometheus.service.type }})
+  kube-state-metrics:  {{ .Values.monitoring.kubeStateMetrics.enabled }}
+  node-exporter:       {{ .Values.monitoring.nodeExporter.enabled }}
+{{- end }}
+
+Check status:
+  kubectl -n {{ .Release.Namespace }} get pods
+  kubectl -n {{ .Release.Namespace }} logs -l app.kubernetes.io/component=cluster-agent -f
+
+{{- if .Values.monitoring.enabled }}
+
+Query Prometheus (port-forward):
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "devopscopilot.prometheus.fullname" . }} {{ .Values.monitoring.prometheus.service.port }}:{{ .Values.monitoring.prometheus.service.port }}
+  # then open http://localhost:{{ .Values.monitoring.prometheus.service.port }}
+{{- end }}

@@ -1,0 +1,191 @@
+{{- if .Values.costMonitoring.enabled }}
+{{- $ns := default .Release.Namespace .Values.costMonitoring.namespace }}
+{{- $prom := .Values.costMonitoring.prometheusEndpoint | default (printf "http://%s.%s.svc.cluster.local:9090" (include "devopscopilot.prometheus.fullname" .) .Release.Namespace) }}
+# OpenCost — Kubernetes cost monitoring for the Trends > Cost tab.
+#
+# Deployed as plain templates rather than a subchart: it is a single Deployment
+# that reuses the Prometheus this chart already installs, so pulling in the
+# upstream chart would add dependency management for no benefit.
+#
+# ⚠ Every figure comes from .Values.costMonitoring.pricing. On bare metal there
+# is no billing API to correct them, so leaving the placeholder rates in place
+# means the dashboard reports arithmetic rather than spend.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "devopscopilot.fullname" . }}-opencost
+  namespace: {{ $ns }}
+  labels:
+    {{- include "devopscopilot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cost
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "devopscopilot.fullname" . }}-opencost
+  labels:
+    {{- include "devopscopilot.labels" . | nindent 4 }}
+rules:
+  # Read-only throughout; OpenCost only observes.
+  - apiGroups: [""]
+    resources:
+      - configmaps
+      - nodes
+      - pods
+      - services
+      - resourcequotas
+      - replicationcontrollers
+      - limitranges
+      - persistentvolumeclaims
+      - persistentvolumes
+      - namespaces
+      - endpoints
+      - events
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets", "deployments", "daemonsets", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["cronjobs", "jobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "devopscopilot.fullname" . }}-opencost
+  labels:
+    {{- include "devopscopilot.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "devopscopilot.fullname" . }}-opencost
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "devopscopilot.fullname" . }}-opencost
+    namespace: {{ $ns }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "devopscopilot.fullname" . }}-opencost-pricing
+  namespace: {{ $ns }}
+  labels:
+    {{- include "devopscopilot.labels" . | nindent 4 }}
+data:
+  # USD per unit per hour.
+  default.json: |
+    {
+      "description": "Rates from .Values.costMonitoring.pricing",
+      "CPU": {{ .Values.costMonitoring.pricing.CPU | quote }},
+      "spotCPU": {{ .Values.costMonitoring.pricing.CPU | quote }},
+      "RAM": {{ .Values.costMonitoring.pricing.RAM | quote }},
+      "spotRAM": {{ .Values.costMonitoring.pricing.RAM | quote }},
+      "GPU": {{ .Values.costMonitoring.pricing.GPU | quote }},
+      "storage": {{ .Values.costMonitoring.pricing.storage | quote }},
+      "zoneNetworkEgress": "0.00",
+      "regionNetworkEgress": "0.00",
+      "internetNetworkEgress": "0.00"
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "devopscopilot.fullname" . }}-opencost
+  namespace: {{ $ns }}
+  labels:
+    {{- include "devopscopilot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cost
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "devopscopilot.opencost.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "devopscopilot.opencost.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "devopscopilot.fullname" . }}-opencost
+      containers:
+        - name: opencost
+          image: {{ .Values.costMonitoring.image | quote }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 9003
+            - name: metrics
+              containerPort: 9090
+          env:
+            - name: PROMETHEUS_SERVER_ENDPOINT
+              value: {{ $prom | quote }}
+            - name: CLOUD_PROVIDER_API_KEY
+              value: ""
+            # Makes OpenCost use the mounted price list instead of a cloud API.
+            - name: CONFIG_PATH
+              value: /models/
+            - name: CLUSTER_ID
+              value: {{ .Values.costMonitoring.clusterId | quote }}
+          volumeMounts:
+            - name: pricing
+              mountPath: /models
+          resources:
+            {{- toYaml .Values.costMonitoring.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 9003
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9003
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1001
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: pricing
+          configMap:
+            name: {{ include "devopscopilot.fullname" . }}-opencost-pricing
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "devopscopilot.fullname" . }}-opencost
+  namespace: {{ $ns }}
+  labels:
+    {{- include "devopscopilot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cost
+spec:
+  type: {{ .Values.costMonitoring.service.type }}
+  selector:
+    {{- include "devopscopilot.opencost.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: 9003
+      targetPort: 9003
+      {{- if eq .Values.costMonitoring.service.type "NodePort" }}
+      nodePort: {{ .Values.costMonitoring.service.nodePort }}
+      {{- end }}
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+{{- end }}

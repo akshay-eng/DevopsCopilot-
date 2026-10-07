@@ -1,0 +1,4 @@
+{"role":"user","content":"Remember this: my favourite namespace is kube-system. Just acknowledge it in one sentence. Do not use tools.","userId":"6a2ad8dbf4c38014f5f95b68","at":"2026-09-30T12:34:14.864Z"}
+{"role":"assistant","content":"\n\nAcknowledged — I note that kube-system is your favourite namespace.","userId":"6a2ad8dbf4c38014f5f95b68","model":"vllm-onprem","at":"2026-09-30T12:34:19.599Z"}
+{"role":"user","content":"What was my favourite namespace? Answer in one short sentence.","userId":"6a2ad8dbf4c38014f5f95b68","at":"2026-09-30T12:34:19.662Z"}
+{"role":"assistant","content":"\n\nYour favourite namespace is kube-system.\n</think>\n\nYour favourite namespace is kube-system.","userId":"6a2ad8dbf4c38014f5f95b68","model":"vllm-onprem","at":"2026-09-30T12:34:22.934Z"}

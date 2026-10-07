@@ -1,0 +1,51 @@
+{
+  "default": "vllm-onprem",
+  "models": [
+    {
+      "id": "vllm-onprem",
+      "label": "On-prem vLLM (qwopus3.5-9b-v3)",
+      "provider": "custom",
+      "api": "openai-completions",
+      "baseUrl": "http://172.17.65.184:8000/v1",
+      "model": "qwopus3.5-9b-v3",
+      "apiKeyEnv": "VLLM_API_KEY",
+      "thinkingLevel": "off",
+      "onPrem": true
+    },
+    {
+      "id": "ollama-local",
+      "label": "Local Ollama (bring your own)",
+      "provider": "custom",
+      "api": "openai-completions",
+      "baseUrl": "http://localhost:11434/v1",
+      "model": "llama3.1:8b",
+      "apiKeyEnv": "OLLAMA_API_KEY",
+      "thinkingLevel": "off",
+      "onPrem": true
+    },
+    {
+      "id": "anthropic-opus",
+      "label": "Anthropic Claude Opus 4.5",
+      "provider": "anthropic",
+      "model": "claude-opus-4-5",
+      "apiKeyEnv": "ANTHROPIC_API_KEY",
+      "thinkingLevel": "medium"
+    },
+    {
+      "id": "openai-gpt4o",
+      "label": "OpenAI GPT-4o",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "thinkingLevel": "off"
+    },
+    {
+      "id": "bedrock-claude",
+      "label": "AWS Bedrock Claude 3.5 Sonnet",
+      "provider": "bedrock",
+      "model": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+      "region": "us-east-1",
+      "thinkingLevel": "off"
+    }
+  ]
+}

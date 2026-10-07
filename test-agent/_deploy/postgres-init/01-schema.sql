@@ -1,0 +1,24 @@
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+CREATE TABLE IF NOT EXISTS orgs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL DEFAULT 'Default Org',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS projects (
+    id UUID PRIMARY KEY,
+    org_id UUID REFERENCES orgs(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    api_key VARCHAR(255) UNIQUE NOT NULL,
+    environment VARCHAR(50) DEFAULT 'development',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_projects_api_key ON projects(api_key);
+CREATE INDEX IF NOT EXISTS idx_projects_org_id ON projects(org_id);
+
+INSERT INTO orgs (name)
+SELECT 'DevOps Copilot'
+WHERE NOT EXISTS (SELECT 1 FROM orgs);

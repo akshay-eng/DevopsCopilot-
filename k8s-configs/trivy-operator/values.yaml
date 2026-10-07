@@ -1,0 +1,59 @@
+# Trivy Operator Helm values — tuned for the AIOps DevOps Copilot vulnerability tab.
+#
+# Install:
+#   helm repo add aqua https://aquasecurity.github.io/helm-charts/
+#   helm repo update
+#   helm upgrade --install trivy-operator aqua/trivy-operator \
+#     --namespace trivy-system --create-namespace \
+#     --values k8s-configs/trivy-operator/values.yaml
+#
+# The operator watches every workload in the cluster and continuously produces
+# VulnerabilityReport + ConfigAuditReport CRDs (one per container). The AIOps
+# backend reads those CRDs directly via the Kubernetes API — no extra plumbing.
+
+trivy:
+  # Only report vulnerabilities at these severities (keeps the tab actionable).
+  severity: CRITICAL,HIGH,MEDIUM,LOW
+  # Ignore CVEs that have no fix yet? Keep false so the tab shows everything,
+  # and the "fixed version" column tells users what is actually remediable.
+  ignoreUnfixed: false
+  # Use an offline / air-gapped DB mirror by setting these if needed on-prem:
+  # dbRepository: <your-registry>/trivy-db
+  timeout: 5m0s
+
+operator:
+  # Scan the current revision of each workload (Deployment -> current ReplicaSet).
+  scanJobsConcurrentLimit: 5
+  scanJobRetryAfter: 30s
+  # "Timely basis": re-scan cadence. Reports older than this TTL are refreshed.
+  # 6h gives near-daily-plus freshness without hammering the cluster; lower for
+  # tighter SLAs, raise to reduce load.
+  vulnerabilityScannerReportTTL: "6h"
+  # Also produce config-audit (misconfiguration) + RBAC + exposed-secret reports.
+  vulnerabilityScannerEnabled: true
+  configAuditScannerEnabled: true
+  rbacAssessmentScannerEnabled: true
+  exposedSecretScannerEnabled: true
+  # Emit Prometheus metrics so scan health shows up alongside the rest of AIOps.
+  metricsFindingsEnabled: true
+  scanJobsRetryDelay: 30s
+
+# Keep the operator light on small / on-prem clusters.
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 500Mi
+
+nodeCollector:
+  # Node-level scanning (kernel / installed packages). Safe to keep on.
+  volumeMounts: []
+
+# Scan jobs run in this namespace; give them a modest footprint.
+trivyOperator:
+  scanJobPodTemplateContainerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true

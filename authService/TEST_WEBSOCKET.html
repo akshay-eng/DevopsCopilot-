@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevOps Copilot - WebSocket Test</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        h2 {
+            color: #666;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+        }
+        input {
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .log-container {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .log-line {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid transparent;
+        }
+        .log-line.info {
+            border-left-color: #4CAF50;
+        }
+        .log-line.error {
+            border-left-color: #f44336;
+            color: #ff6b6b;
+        }
+        .log-line.warn {
+            border-left-color: #ff9800;
+            color: #ffd93d;
+        }
+        .timestamp {
+            color: #888;
+            margin-right: 10px;
+        }
+        .event-type {
+            color: #61dafb;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+            font-weight: bold;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .controls button {
+            flex: 1;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 DevOps Copilot - WebSocket Test Client</h1>
+        <div id="connectionStatus" class="status disconnected">
+            ❌ Disconnected
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="logCount">0</div>
+                <div class="stat-label">Logs Received</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="alertCount">0</div>
+                <div class="stat-label">Alerts Received</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="eventCount">0</div>
+                <div class="stat-label">K8s Events</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📡 Connection</h2>
+        <div class="form-group">
+            <label>JWT Token (from localStorage after login)</label>
+            <input type="text" id="token" placeholder="Paste your JWT token here">
+        </div>
+        <button id="connectBtn" onclick="connect()">Connect</button>
+        <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+    </div>
+
+    <div class="container">
+        <h2>📋 Start Log Stream</h2>
+        <div class="form-group">
+            <label>Cluster ID</label>
+            <input type="text" id="clusterId" value="69492a0b8f59968542d8f2a4-prodcluster1">
+        </div>
+        <div class="form-group">
+            <label>Namespace</label>
+            <input type="text" id="namespace" value="default">
+        </div>
+        <div class="form-group">
+            <label>Pod Name</label>
+            <input type="text" id="podName" placeholder="e.g., nginx-7c6b8f9d4-abc12">
+        </div>
+        <div class="form-group">
+            <label>Container (optional)</label>
+            <input type="text" id="container" placeholder="Leave empty for first container">
+        </div>
+        <div class="form-group">
+            <label>Tail Lines</label>
+            <input type="number" id="tailLines" value="50">
+        </div>
+        <button id="startStreamBtn" onclick="startLogStream()" disabled>Start Log Stream</button>
+        <button id="stopStreamBtn" onclick="stopLogStream()" disabled>Stop Log Stream</button>
+    </div>
+
+    <div class="container">
+        <h2>📊 Live Events</h2>
+        <div class="controls">
+            <button onclick="clearLogs()">Clear Logs</button>
+            <button onclick="toggleAutoScroll()" id="autoScrollBtn">Auto-scroll: ON</button>
+        </div>
+        <div class="log-container" id="logContainer">
+            <div class="log-line info">
+                <span class="timestamp">[Ready]</span>
+                <span>Waiting for connection...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let autoScroll = true;
+        let logCount = 0;
+        let alertCount = 0;
+        let eventCount = 0;
+
+        function updateStats() {
+            document.getElementById('logCount').textContent = logCount;
+            document.getElementById('alertCount').textContent = alertCount;
+            document.getElementById('eventCount').textContent = eventCount;
+        }
+
+        function addLog(message, type = 'info') {
+            const container = document.getElementById('logContainer');
+            const line = document.createElement('div');
+            line.className = `log-line ${type}`;
+
+            const timestamp = new Date().toLocaleTimeString();
+            line.innerHTML = `<span class="timestamp">[${timestamp}]</span>${message}`;
+
+            container.appendChild(line);
+
+            if (autoScroll) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        function clearLogs() {
+            document.getElementById('logContainer').innerHTML = '';
+            logCount = 0;
+            alertCount = 0;
+            eventCount = 0;
+            updateStats();
+            addLog('Logs cleared', 'info');
+        }
+
+        function toggleAutoScroll() {
+            autoScroll = !autoScroll;
+            document.getElementById('autoScrollBtn').textContent = `Auto-scroll: ${autoScroll ? 'ON' : 'OFF'}`;
+        }
+
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connectionStatus');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const startStreamBtn = document.getElementById('startStreamBtn');
+            const stopStreamBtn = document.getElementById('stopStreamBtn');
+
+            if (connected) {
+                status.className = 'status connected';
+                status.textContent = '✅ Connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                startStreamBtn.disabled = false;
+            } else {
+                status.className = 'status disconnected';
+                status.textContent = '❌ Disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                startStreamBtn.disabled = true;
+                stopStreamBtn.disabled = true;
+            }
+        }
+
+        function connect() {
+            const token = document.getElementById('token').value.trim();
+
+            if (!token) {
+                alert('Please enter a JWT token');
+                return;
+            }
+
+            addLog('🔌 Connecting to ws://localhost:5001...', 'info');
+
+            socket = io('http://localhost:5001', {
+                auth: { token },
+                reconnection: true,
+                reconnectionDelay: 1000,
+                reconnectionAttempts: 5
+            });
+
+            socket.on('connect', () => {
+                addLog('✅ WebSocket connected', 'info');
+                updateConnectionStatus(true);
+            });
+
+            socket.on('disconnect', (reason) => {
+                addLog(`❌ WebSocket disconnected: ${reason}`, 'error');
+                updateConnectionStatus(false);
+            });
+
+            socket.on('connect_error', (err) => {
+                addLog(`❌ Connection error: ${err.message}`, 'error');
+                updateConnectionStatus(false);
+            });
+
+            socket.on('connected', (data) => {
+                addLog(`<span class="event-type">[CONNECTED]</span>Server confirmed - User ID: ${data.userId}, Socket ID: ${data.socketId}`, 'info');
+            });
+
+            socket.on('pod-logs', (data) => {
+                logCount++;
+                updateStats();
+                const preview = data.logLine.substring(0, 100);
+                addLog(`<span class="event-type">[LOG]</span>${data.namespace}/${data.pod}: ${preview}`, 'info');
+            });
+
+            socket.on('alert', (data) => {
+                alertCount++;
+                updateStats();
+                addLog(`<span class="event-type">[ALERT]</span>${data.severity} - ${data.alertname} (${data.namespace}/${data.pod || 'N/A'})`, 'warn');
+            });
+
+            socket.on('k8s-event', (data) => {
+                eventCount++;
+                updateStats();
+                addLog(`<span class="event-type">[K8S-EVENT]</span>${data.reason} - ${data.message}`, 'info');
+            });
+
+            socket.on('resource-update', (data) => {
+                addLog(`<span class="event-type">[RESOURCE]</span>${data.action} - ${data.resourceType} ${data.namespace}/${data.name}`, 'info');
+            });
+
+            socket.on('metrics-update', (data) => {
+                addLog(`<span class="event-type">[METRICS]</span>${data.resourceType} metrics updated`, 'info');
+            });
+
+            socket.on('cluster-heartbeat', (data) => {
+                addLog(`<span class="event-type">[HEARTBEAT]</span>Cluster ${data.clusterId}: ${data.status}`, 'info');
+            });
+
+            socket.on('log-stream-started', (data) => {
+                addLog(`<span class="event-type">[STREAM]</span>Log stream started for ${data.namespace}/${data.pod}`, 'info');
+                document.getElementById('stopStreamBtn').disabled = false;
+            });
+
+            socket.on('log-stream-stopped', (data) => {
+                addLog(`<span class="event-type">[STREAM]</span>Log stream stopped for ${data.namespace}/${data.pod}`, 'info');
+                document.getElementById('stopStreamBtn').disabled = true;
+            });
+
+            socket.on('log-stream-error', (data) => {
+                addLog(`<span class="event-type">[ERROR]</span>Log stream error: ${data.error}`, 'error');
+            });
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                addLog('🔌 Disconnected by user', 'info');
+                updateConnectionStatus(false);
+            }
+        }
+
+        function startLogStream() {
+            const clusterId = document.getElementById('clusterId').value.trim();
+            const namespace = document.getElementById('namespace').value.trim();
+            const podName = document.getElementById('podName').value.trim();
+            const container = document.getElementById('container').value.trim();
+            const tailLines = parseInt(document.getElementById('tailLines').value);
+
+            if (!clusterId || !namespace || !podName) {
+                alert('Please fill in Cluster ID, Namespace, and Pod Name');
+                return;
+            }
+
+            const data = {
+                clusterId,
+                namespace,
+                pod: podName,
+                tailLines
+            };
+
+            if (container) {
+                data.container = container;
+            }
+
+            addLog(`📤 Starting log stream for ${namespace}/${podName}...`, 'info');
+            socket.emit('start-log-stream', data);
+        }
+
+        function stopLogStream() {
+            const clusterId = document.getElementById('clusterId').value.trim();
+            const namespace = document.getElementById('namespace').value.trim();
+            const podName = document.getElementById('podName').value.trim();
+            const container = document.getElementById('container').value.trim();
+
+            const data = {
+                clusterId,
+                namespace,
+                pod: podName
+            };
+
+            if (container) {
+                data.container = container;
+            }
+
+            addLog(`📤 Stopping log stream for ${namespace}/${podName}...`, 'info');
+            socket.emit('stop-log-stream', data);
+        }
+
+        // Auto-populate token from localStorage if running on localhost:3000
+        window.addEventListener('load', () => {
+            const storedToken = localStorage.getItem('token');
+            if (storedToken) {
+                document.getElementById('token').value = storedToken;
+                addLog('📝 Token loaded from localStorage', 'info');
+            } else {
+                addLog('⚠️  No token found in localStorage. Please login first or paste token manually.', 'warn');
+            }
+        });
+    </script>
+</body>
+</html>

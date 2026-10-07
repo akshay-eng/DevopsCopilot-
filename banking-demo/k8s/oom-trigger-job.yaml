@@ -1,0 +1,37 @@
+# Run this to trigger OOM on the DB pod by creating memory pressure
+# kubectl apply -f oom-trigger-job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-stress-test
+  namespace: banking-demo
+spec:
+  template:
+    metadata:
+      labels:
+        app: db-stress
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: stress
+          image: postgres:15-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Connecting to bank-db and creating memory pressure..."
+              # Create massive temp tables to exhaust the 64Mi limit
+              for i in $(seq 1 20); do
+                PGPASSWORD=bankpass psql -h bank-db -U bankuser -d bankdb -c "
+                  CREATE TABLE IF NOT EXISTS stress_$i AS
+                  SELECT generate_series(1, 500000) as id,
+                         repeat('x', 1000) as payload;
+                " &
+              done
+              wait
+              echo "Stress test complete"
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+  backoffLimit: 1

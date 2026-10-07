@@ -1,0 +1,270 @@
+import React, { useState } from 'react';
+import { useTheme } from '../../context/ThemeContext';
+import { useAgentOpsMetrics } from '../../hooks/useAgentOpsMetrics';
+import { ChartCard } from '../ui/chart-card';
+import { FormattedTokenDisplay } from '../ui/formatted-token-display';
+import { StatSkeleton, ChartSkeleton } from '../ui/skeletons';
+import { Separator } from '../ui/separator';
+import { Progress } from '../ui/progress';
+import { NoTracesFound } from '../ui/no-traces-found';
+import { formatPrice, formatPercentage, formatNumber } from '../../utils/agentopsFormatters';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { startOfMonth, endOfMonth, subDays, format } from 'date-fns';
+import { RefreshCw } from 'lucide-react';
+
+const Analytics = () => {
+    const { theme } = useTheme();
+    const [dateRange] = useState({
+        from: subDays(new Date(), 30),
+        to: new Date(),
+    });
+
+    const { metrics, metricsLoading, isFetching, refreshMetrics } = useAgentOpsMetrics(dateRange);
+
+    const currentMonthRange = {
+        from: startOfMonth(new Date()),
+        to: endOfMonth(new Date()),
+    };
+    const { metrics: monthlyMetrics, metricsLoading: monthlyLoading } = useAgentOpsMetrics(currentMonthRange);
+
+    const hasFilteredTokenMetrics = !!metrics?.token_metrics;
+    const hasTraces = metrics && metrics.trace_count > 0;
+
+    // Prepare chart data
+    const successFailData = React.useMemo(() => {
+        if (!metrics?.success_datetime || !metrics?.fail_datetime) return [];
+
+        const dateMap = new Map();
+
+        metrics.success_datetime?.forEach((timestamp) => {
+            const date = format(new Date(timestamp), 'MMM dd');
+            const existing = dateMap.get(date) || { date, success: 0, fail: 0 };
+            dateMap.set(date, { ...existing, success: existing.success + 1 });
+        });
+
+        metrics.fail_datetime?.forEach((timestamp) => {
+            const date = format(new Date(timestamp), 'MMM dd');
+            const existing = dateMap.get(date) || { date, success: 0, fail: 0 };
+            dateMap.set(date, { ...existing, fail: existing.fail + 1 });
+        });
+
+        return Array.from(dateMap.values()).sort((a, b) => {
+            return new Date(a.date) - new Date(b.date);
+        });
+    }, [metrics]);
+
+    const monthlySpanUsage = monthlyMetrics?.span_count?.total || 0;
+    const maxSpans = 10000; // Free tier limit
+    const usagePercentage = Math.min((monthlySpanUsage / maxSpans) * 100, 100);
+
+    return (
+        <div className={`flex flex-col gap-4 p-6 ${theme === 'dark' ? 'bg-[#0a0a0f]' : 'bg-gray-50'}`}>
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <h1 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Analytics</h1>
+                <button
+                    onClick={refreshMetrics}
+                    disabled={isFetching}
+                    className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-purple-500 to-violet-600 px-4 py-2 text-white transition-colors hover:from-purple-600 hover:to-violet-700 disabled:opacity-50"
+                >
+                    <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+                    Refresh
+                </button>
+            </div>
+
+            {/* Overview Stats */}
+            <div className="mb-4">
+                <h2 className={`mb-4 text-2xl font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Overview</h2>
+                <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-5">
+                    <ChartCard
+                        title="Total Cost"
+                        tooltipContent="Total cost across all traces"
+                        cardStyles="shadow-sm h-24"
+                        cardContentStyles="p-0 pl-2"
+                    >
+                        {metricsLoading || !hasFilteredTokenMetrics ? (
+                            <StatSkeleton />
+                        ) : (
+                            <div className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                {formatPrice(metrics.token_metrics.total_cost)}
+                            </div>
+                        )}
+                    </ChartCard>
+
+                    <ChartCard
+                        title="Tokens Generated"
+                        tooltipContent="Total tokens generated"
+                        cardStyles="shadow-sm h-24"
+                        cardContentStyles="p-0 pl-2"
+                    >
+                        {metricsLoading || !hasFilteredTokenMetrics ? (
+                            <StatSkeleton />
+                        ) : (
+                            <div className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                <FormattedTokenDisplay value={metrics.token_metrics.total_tokens?.all} />
+                            </div>
+                        )}
+                    </ChartCard>
+
+                    <ChartCard
+                        title="Fail Rate"
+                        tooltipContent="Percentage of failed traces"
+                        cardStyles="shadow-sm h-24"
+                        cardContentStyles="p-0 pl-2"
+                    >
+                        {metricsLoading || !metrics ? (
+                            <StatSkeleton />
+                        ) : (
+                            <div className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                {formatPercentage(
+                                    (metrics.fail_datetime?.length ?? 0) /
+                                    ((metrics.success_datetime?.length ?? 0) + (metrics.fail_datetime?.length ?? 0))
+                                )}
+                            </div>
+                        )}
+                    </ChartCard>
+
+                    <ChartCard
+                        title="Total Events"
+                        tooltipContent="Total number of events/spans"
+                        cardStyles="shadow-sm h-24"
+                        cardContentStyles="p-0 pl-2"
+                    >
+                        {metricsLoading || !metrics?.span_count ? (
+                            <StatSkeleton />
+                        ) : (
+                            <div className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                <FormattedTokenDisplay value={metrics.span_count.total} />
+                            </div>
+                        )}
+                    </ChartCard>
+
+                    <ChartCard
+                        title="Monthly Spans"
+                        tooltipContent="Spans used this month (resets monthly)"
+                        cardStyles="shadow-sm h-24"
+                        cardContentStyles="p-0 pl-2"
+                    >
+                        {monthlyLoading ? (
+                            <StatSkeleton />
+                        ) : (
+                            <div className="flex flex-col gap-1">
+                                <div className={`text-xl font-semibold ${usagePercentage > 90 ? 'text-red-600' : theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                    {formatNumber(monthlySpanUsage)} / {formatNumber(maxSpans)}
+                                </div>
+                                {usagePercentage > 90 && (
+                                    <span className="text-xs text-red-600">{usagePercentage.toFixed(0)}% used</span>
+                                )}
+                            </div>
+                        )}
+                    </ChartCard>
+                </div>
+            </div>
+
+            <Separator />
+
+            {/* Analytics Section */}
+            <div className="mt-4">
+                <div className="mb-4 flex items-center justify-between">
+                    <h2 className={`text-2xl font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Analytics</h2>
+                    <div className={`flex items-center gap-3 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-gray-600'}`}>
+                        <span>
+                            {formatNumber(monthlySpanUsage)} / {formatNumber(maxSpans)} spans this month
+                        </span>
+                        <Progress value={usagePercentage} className="h-2 w-24" />
+                    </div>
+                </div>
+
+                {metricsLoading ? (
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <ChartSkeleton />
+                        <ChartSkeleton />
+                    </div>
+                ) : !hasTraces ? (
+                    <NoTracesFound />
+                ) : (
+                    <div className="grid gap-6 md:grid-cols-2">
+                        {/* Success/Fail Chart */}
+                        <div className={`rounded-lg p-6 shadow-lg ${theme === 'dark' ? 'bg-[#13131f]' : 'bg-white'}`}>
+                            <h3 className={`mb-4 text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Traces Over Time</h3>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={successFailData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#374151' : '#E5E7EB'} />
+                                    <XAxis dataKey="date" stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'} />
+                                    <YAxis stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'} />
+                                    <Tooltip
+                                        contentStyle={{
+                                            backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            color: theme === 'dark' ? '#fff' : '#000',
+                                        }}
+                                    />
+                                    <Legend />
+                                    <Bar dataKey="success" fill="#10B981" name="Success" />
+                                    <Bar dataKey="fail" fill="#EF4444" name="Failed" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+
+                        {/* Token Usage Chart */}
+                        <div className={`rounded-lg p-6 shadow-lg ${theme === 'dark' ? 'bg-[#13131f]' : 'bg-white'}`}>
+                            <h3 className={`mb-4 text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Token Usage</h3>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <LineChart data={successFailData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#374151' : '#E5E7EB'} />
+                                    <XAxis dataKey="date" stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'} />
+                                    <YAxis stroke={theme === 'dark' ? '#9CA3AF' : '#6B7280'} />
+                                    <Tooltip
+                                        contentStyle={{
+                                            backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            color: theme === 'dark' ? '#fff' : '#000',
+                                        }}
+                                    />
+                                    <Legend />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="success"
+                                        stroke="#8B5CF6"
+                                        strokeWidth={2}
+                                        name="Tokens"
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+
+                        {/* Cost Over Time */}
+                        <div className={`rounded-lg p-6 shadow-lg ${theme === 'dark' ? 'bg-[#13131f]' : 'bg-white'}`}>
+                            <h3 className={`mb-4 text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Cost Over Time</h3>
+                            <div className={`flex h-[300px] items-center justify-center ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>
+                                <div className="text-center">
+                                    <p className="mb-2 text-lg font-medium">Total Cost</p>
+                                    <p className="text-3xl font-bold text-purple-600">
+                                        {formatPrice(metrics.token_metrics?.total_cost)}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Span Count */}
+                        <div className={`rounded-lg p-6 shadow-lg ${theme === 'dark' ? 'bg-[#13131f]' : 'bg-white'}`}>
+                            <h3 className={`mb-4 text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Span Distribution</h3>
+                            <div className={`flex h-[300px] items-center justify-center ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>
+                                <div className="text-center">
+                                    <p className="mb-2 text-lg font-medium">Total Spans</p>
+                                    <p className="text-3xl font-bold text-purple-600">
+                                        {formatNumber(metrics.span_count?.total)}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default Analytics;

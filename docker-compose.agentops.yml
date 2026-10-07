@@ -1,0 +1,58 @@
+services:
+  # AgentOps PostgreSQL Database
+  agentops-postgres:
+    image: postgres:15
+    container_name: agentops-postgres
+    environment:
+      POSTGRES_DB: agentops
+      POSTGRES_USER: agentops
+      POSTGRES_PASSWORD: ${AGENTOPS_DB_PASSWORD:-agentops_secret}
+    volumes:
+      - agentops-postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - devops-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentops"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # AgentOps API Server (Python/FastAPI)
+  agentops-api:
+    image: agentops/api:latest
+    build:
+      context: ./agentops/app
+      dockerfile: api/Dockerfile
+    container_name: agentops-api
+    environment:
+      DATABASE_URL: postgresql://agentops:${AGENTOPS_DB_PASSWORD:-agentops_secret}@agentops-postgres:5432/agentops
+      SUPABASE_HOST: agentops-postgres
+      SUPABASE_PORT: "5432"
+      SUPABASE_DATABASE: agentops
+      SUPABASE_USER: agentops
+      SUPABASE_PASSWORD: ${AGENTOPS_DB_PASSWORD:-agentops_secret}
+      SUPABASE_SSLMODE: disable
+      JWT_SECRET_KEY: ${JWT_SECRET:-your-jwt-secret-here-change-this-in-production}
+      AUTH_COOKIE_SECRET: dev-auth-cookie-secret-change-in-production-64chars-min
+      CORS_ORIGINS: http://localhost:3000,http://localhost:5000
+      ENVIRONMENT: development
+      PYTHON_ENV: development
+    ports:
+      - "8000:8000"
+    depends_on:
+      agentops-postgres:
+        condition: service_healthy
+    networks:
+      - devops-network
+    restart: unless-stopped
+
+volumes:
+  agentops-postgres-data:
+
+networks:
+  devops-network:
+    name: devops-network
+    driver: bridge

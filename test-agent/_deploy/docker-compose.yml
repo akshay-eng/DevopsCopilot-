@@ -1,0 +1,74 @@
+services:
+  agentops-postgres:
+    image: postgres:15-alpine
+    container_name: do-agentops-postgres
+    environment:
+      POSTGRES_USER: agentops
+      POSTGRES_PASSWORD: agentops_secret
+      POSTGRES_DB: agentops
+    ports:
+      - "5432:5432"
+    volumes:
+      - agentops_pg_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentops"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  agentops-redis:
+    image: redis:7-alpine
+    container_name: do-agentops-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  agentops-clickhouse:
+    image: clickhouse/clickhouse-server:24.12
+    container_name: do-agentops-clickhouse
+    environment:
+      CLICKHOUSE_DB: otel_2
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: password
+    ports:
+      - "8123:8123"
+      - "9009:9000"
+    volumes:
+      - agentops_ch_data:/var/lib/clickhouse
+      - ./otel-collector-build/clickhouse/default_ddl:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  agentops-otelcollector:
+    build:
+      context: ./otel-collector-build
+      dockerfile: Dockerfile
+    container_name: do-agentops-otelcollector
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "13133:13133"
+    environment:
+      CLICKHOUSE_ENDPOINT: http://agentops-clickhouse:8123
+      CLICKHOUSE_USERNAME: default
+      CLICKHOUSE_PASSWORD: password
+      CLICKHOUSE_DATABASE: default
+      LOGS_TABLE_NAME: otel_logs
+      TRACES_TABLE_NAME: otel_traces
+      CLICKHOUSE_TTL: 4320h
+      CLICKHOUSE_TIMEOUT: 10s
+      JWT_SECRET: dev-service-token-12345
+    depends_on:
+      agentops-clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  agentops_pg_data:
+  agentops_ch_data:

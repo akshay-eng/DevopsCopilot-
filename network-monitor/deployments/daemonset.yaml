@@ -1,0 +1,185 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: network-monitor
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: network-monitor
+  namespace: network-monitor
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: network-monitor
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: network-monitor
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: network-monitor
+subjects:
+- kind: ServiceAccount
+  name: network-monitor
+  namespace: network-monitor
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: network-monitor-config
+  namespace: network-monitor
+data:
+  KAFKA_BROKERS: "kafka-broker-1.kafka.svc.cluster.local:29092,kafka-broker-2.kafka.svc.cluster.local:29093,kafka-broker-3.kafka.svc.cluster.local:29094"
+  KAFKA_TOPIC: "network-events"
+  NEO4J_URI: "bolt://neo4j.default.svc.cluster.local:7687"
+  NEO4J_USER: "neo4j"
+  USER_ID: "6a2aab3877fd333c99d683cf"
+  CLUSTER_ID: "6a2fd969f4c38014f5f973d4"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: network-monitor-secrets
+  namespace: network-monitor
+type: Opaque
+stringData:
+  NEO4J_PASSWORD: "changeme"
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: network-monitor
+  namespace: network-monitor
+  labels:
+    app: network-monitor
+spec:
+  selector:
+    matchLabels:
+      app: network-monitor
+  template:
+    metadata:
+      labels:
+        app: network-monitor
+    spec:
+      serviceAccountName: network-monitor
+      hostNetwork: true
+      hostPID: true
+      dnsPolicy: ClusterFirstWithHostNet
+      dnsConfig:
+        searches:
+        - kafka.svc.cluster.local
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: monitor
+        image: ak3hay/network-monitor:latest
+        imagePullPolicy: Always
+        securityContext:
+          privileged: true
+          capabilities:
+            add:
+            - SYS_ADMIN
+            - NET_ADMIN
+            - BPF
+            - SYS_RESOURCE
+            - PERFMON
+            - IPC_LOCK
+        resources:
+          limits:
+            memory: 100Mi
+            cpu: 200m
+          requests:
+            memory: 50Mi
+            cpu: 100m
+        env:
+        - name: KAFKA_BROKERS
+          valueFrom:
+            configMapKeyRef:
+              name: network-monitor-config
+              key: KAFKA_BROKERS
+        - name: NEO4J_URI
+          valueFrom:
+            configMapKeyRef:
+              name: network-monitor-config
+              key: NEO4J_URI
+        - name: NEO4J_USER
+          valueFrom:
+            configMapKeyRef:
+              name: network-monitor-config
+              key: NEO4J_USER
+        - name: NEO4J_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: network-monitor-secrets
+              key: NEO4J_PASSWORD
+        - name: USER_ID
+          valueFrom:
+            configMapKeyRef:
+              name: network-monitor-config
+              key: USER_ID
+        - name: CLUSTER_ID
+          valueFrom:
+            configMapKeyRef:
+              name: network-monitor-config
+              key: CLUSTER_ID
+        - name: KAFKA_TOPIC
+          valueFrom:
+            configMapKeyRef:
+              name: network-monitor-config
+              key: KAFKA_TOPIC
+        volumeMounts:
+        - name: sys
+          mountPath: /sys
+          readOnly: true
+        - name: debugfs
+          mountPath: /sys/kernel/debug
+        - name: bpffs
+          mountPath: /sys/fs/bpf
+        - name: lib-modules
+          mountPath: /lib/modules
+          readOnly: true
+      volumes:
+      - name: sys
+        hostPath:
+          path: /sys
+          type: Directory
+      - name: debugfs
+        hostPath:
+          path: /sys/kernel/debug
+          type: Directory
+      - name: bpffs
+        hostPath:
+          path: /sys/fs/bpf
+          type: DirectoryOrCreate
+      - name: lib-modules
+        hostPath:
+          path: /lib/modules
+          type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: network-monitor-metrics
+  namespace: network-monitor
+  labels:
+    app: network-monitor
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: metrics
+  selector:
+    app: network-monitor

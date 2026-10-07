@@ -1,0 +1,195 @@
+# ============================================================================
+# DevOps Copilot / KubeAI — lightweight cluster agent + optional monitoring
+# ============================================================================
+# Minimal install:
+#   helm install dcp ./helm/devopscopilot -n devopscopilot --create-namespace \
+#     --set config.kafkaBootstrapServers="broker:9092" \
+#     --set config.backendUrl="http://<backend-host>:5001" \
+#     --set secret.userId="<mongo-user-id>" \
+#     --set secret.clusterId="<mongo-cluster-id>" \
+#     --set monitoring.enabled=true
+# ============================================================================
+
+nameOverride: ""
+fullnameOverride: ""
+
+# --- Cluster Agent -----------------------------------------------------------
+agent:
+  # Delivery mode:
+  #   "image"   -> use a prebuilt image (lightest at runtime; needs a registry). RECOMMENDED.
+  #   "bundled" -> ship app.py + prometheus_collector.py in a ConfigMap and pip-install
+  #                deps in an initContainer at startup (no registry / no image build needed).
+  mode: image
+
+  image:
+    # Used when mode=image. Build & push with: helm/devopscopilot/build-and-push.sh
+    repository: ak3hay/devopscopilot-cluster-agent
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  # Base Python image used only when mode=bundled.
+  bundledBaseImage: public.ecr.aws/docker/library/python:3.11-slim
+
+  replicas: 1
+
+  # Deliberately small — the agent is a lightweight watcher + metrics poller.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # ClusterIP service exposing /health and the log-streaming API (backend calls this).
+  service:
+    port: 8080
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# --- Agent configuration (rendered into a ConfigMap -> env vars) -------------
+config:
+  clusterName: "my-cluster"
+  # Comma-separated Kafka bootstrap servers the agent publishes events/metrics to.
+  kafkaBootstrapServers: ""
+  # Backend (authService) base URL the agent checks in to.
+  backendUrl: ""
+  # Prometheus base URL the agent queries.
+  # Leave EMPTY to auto-target the bundled Prometheus when monitoring.enabled=true.
+  prometheusUrl: ""
+  logLevel: "INFO"
+  watchInterval: "30"
+  heartbeatInterval: "60"
+  metricsInterval: "120"
+
+# --- Agent identity + optional Kafka SASL (rendered into a Secret) -----------
+# You can instead reference a pre-existing secret via secret.existingSecret.
+secret:
+  existingSecret: ""      # if set, these values are ignored
+  userId: ""              # MongoDB user id from onboarding
+  clusterId: ""           # MongoDB cluster id from onboarding
+  kafkaUsername: ""
+  kafkaPassword: ""
+
+# --- Optional lightweight monitoring stack -----------------------------------
+# Prometheus + kube-state-metrics + node-exporter. No operator, no CRDs, no Grafana.
+monitoring:
+  enabled: false
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    # Short retention keeps disk/memory small. The app queries ~2h ranges.
+    retention: 12h
+    scrapeInterval: 30s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    persistence:
+      # false -> emptyDir (data lost on pod restart, smallest footprint).
+      enabled: false
+      size: 5Gi
+      storageClass: ""
+    service:
+      type: ClusterIP      # ClusterIP | NodePort
+      port: 9090
+      nodePort: ""         # set when type=NodePort (e.g. 32738)
+    # Keep only the metrics the app uses (smaller TSDB). Set false to keep everything.
+    trimMetrics: true
+
+  kubeStateMetrics:
+    enabled: true
+    image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.13.0
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+  nodeExporter:
+    enabled: true
+    image: prom/node-exporter:v1.8.2
+    resources:
+      requests:
+        cpu: 10m
+        memory: 24Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+
+# --- Optional vulnerability scanning (Trivy Operator) ------------------------
+# When enabled, Trivy Operator is installed as a subchart. It continuously scans
+# workload images and emits VulnerabilityReport CRDs the AIOps backend reads for
+# the per-resource Vulnerabilities tab + agentic remediation.
+#
+# Before install, vendor the subchart:
+#   helm repo add aqua https://aquasecurity.github.io/helm-charts/
+#   helm dependency build ./helm/devopscopilot
+# then install with --set vulnerabilityScanning.enabled=true
+vulnerabilityScanning:
+  enabled: false
+
+# Values passed through to the trivy-operator subchart (only used when enabled).
+# Tuned to match k8s-configs/trivy-operator/values.yaml.
+trivyOperator:
+  trivy:
+    severity: "CRITICAL,HIGH,MEDIUM,LOW"
+    ignoreUnfixed: false
+    timeout: "5m0s"
+  operator:
+    # "Timely basis": reports older than this TTL are refreshed. Lower for tighter
+    # SLAs, raise to reduce cluster load.
+    vulnerabilityScannerReportTTL: "6h"
+    scanJobsConcurrentLimit: 5
+    vulnerabilityScannerEnabled: true
+    configAuditScannerEnabled: true
+    rbacAssessmentScannerEnabled: true
+    exposedSecretScannerEnabled: true
+    metricsFindingsEnabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 500Mi
+
+# ──────────────────────────── Cost monitoring ────────────────────────────
+# OpenCost (CNCF) — per-namespace and per-workload Kubernetes cost, surfaced on
+# the Trends > Cost tab. Deployed as plain templates rather than a subchart: it
+# is one Deployment and reuses the Prometheus this chart already installs.
+#
+# ⚠ On bare metal there is no cloud billing API, so EVERY figure comes from
+# `pricing` below. Replace these placeholders with your real amortised cost per
+# core-hour and per GB-hour or the dashboard is only doing arithmetic.
+costMonitoring:
+  enabled: false
+  image: ghcr.io/opencost/opencost:1.113.0
+  namespace: ""           # defaults to the release namespace
+  clusterId: devopscopilot
+  # Leave blank to point at the Prometheus this chart deploys.
+  prometheusEndpoint: ""
+  service:
+    type: ClusterIP
+    nodePort: 30903       # only used when type is NodePort
+  # USD per unit per hour. See k8s-configs/opencost/opencost.yaml for how to
+  # derive these from your hardware cost.
+  pricing:
+    CPU: "0.0360"
+    RAM: "0.0066"
+    GPU: "0.0000"
+    storage: "0.00005479452"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 150Mi
+    limits:
+      cpu: 500m
+      memory: 500Mi

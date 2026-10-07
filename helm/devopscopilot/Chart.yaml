@@ -1,0 +1,33 @@
+apiVersion: v2
+name: devopscopilot
+description: >-
+  Lightweight in-cluster agent for DevOps Copilot / KubeAI, with an optional
+  minimal monitoring stack (Prometheus + kube-state-metrics + node-exporter).
+  No operator, no CRDs, no Grafana — just what the agent needs to work.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.21.0-0"
+keywords:
+  - aiops
+  - kubernetes
+  - monitoring
+  - observability
+  - prometheus
+home: https://github.com/akshay-eng/KubeAI
+sources:
+  - https://github.com/akshay-eng/KubeAI
+maintainers:
+  - name: Akshay
+
+# Optional in-cluster vulnerability scanning. Trivy Operator continuously scans
+# every workload's images and writes VulnerabilityReport CRDs that the AIOps
+# backend reads for the per-resource Vulnerabilities tab + remediation.
+# Pulled only when vulnerabilityScanning.enabled=true; run `helm dependency build`
+# (or `update`) before install so the subchart is vendored into charts/.
+dependencies:
+  - name: trivy-operator
+    version: ">=0.20.0"
+    repository: https://aquasecurity.github.io/helm-charts/
+    condition: vulnerabilityScanning.enabled
+    alias: trivyOperator

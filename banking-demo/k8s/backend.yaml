@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bank-backend
+  namespace: banking-demo
+  labels:
+    app: bank-backend
+    tier: backend
+spec:
+  type: NodePort
+  ports:
+    - port: 5000
+      targetPort: 5000
+      nodePort: 30500
+  selector:
+    app: bank-backend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bank-backend
+  namespace: banking-demo
+  labels:
+    app: bank-backend
+    tier: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bank-backend
+  template:
+    metadata:
+      labels:
+        app: bank-backend
+        tier: backend
+    spec:
+      containers:
+        - name: backend
+          image: ak3hay/bank-backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+          env:
+            - name: DB_HOST
+              value: bank-db
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: bankdb
+            - name: DB_USER
+              value: bankuser
+            - name: DB_PASS
+              value: bankpass
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 3
+            failureThreshold: 2

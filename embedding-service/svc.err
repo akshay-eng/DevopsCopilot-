@@ -1,0 +1,51 @@
+2026-09-30 05:10:11,952 [INFO] Loading embedding model all-MiniLM-L6-v2 ...
+2026-09-30 05:10:11,961 [INFO] Use pytorch device_name: cpu
+2026-09-30 05:10:11,962 [INFO] Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+2026-09-30 05:10:16,482 [INFO] Model ready: all-MiniLM-L6-v2 (dim=384)
+2026-09-30 05:10:16,487 [INFO] Embedding service starting on port 5006
+2026-09-30 05:10:16,574 [INFO] [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5006
+ * Running on http://172.17.204.2:5006
+2026-09-30 05:10:16,576 [INFO] [33mPress CTRL+C to quit[0m
+2026-09-30 05:10:25,615 [INFO] 127.0.0.1 - - [30/Sep/2026 05:10:25] "GET /health HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00,  1.98it/s]Batches: 100%|██████████| 1/1 [00:00<00:00,  1.97it/s]
+2026-09-30 05:12:25,639 [INFO] 127.0.0.1 - - [30/Sep/2026 05:12:25] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 42.39it/s]
+2026-09-30 05:12:25,786 [INFO] 127.0.0.1 - - [30/Sep/2026 05:12:25] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 58.82it/s]
+2026-09-30 05:12:25,850 [INFO] 127.0.0.1 - - [30/Sep/2026 05:12:25] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 58.82it/s]
+2026-09-30 05:12:25,911 [INFO] 127.0.0.1 - - [30/Sep/2026 05:12:25] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 66.66it/s]
+2026-09-30 05:12:25,968 [INFO] 127.0.0.1 - - [30/Sep/2026 05:12:25] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 58.82it/s]
+2026-09-30 05:12:26,025 [INFO] 127.0.0.1 - - [30/Sep/2026 05:12:26] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 71.43it/s]
+2026-09-30 05:12:26,075 [INFO] 127.0.0.1 - - [30/Sep/2026 05:12:26] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 28.59it/s]
+2026-09-30 05:12:39,156 [INFO] 127.0.0.1 - - [30/Sep/2026 05:12:39] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 43.49it/s]
+2026-09-30 05:12:39,511 [INFO] 127.0.0.1 - - [30/Sep/2026 05:12:39] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00,  6.59it/s]Batches: 100%|██████████| 1/1 [00:00<00:00,  6.54it/s]
+2026-09-30 05:12:54,556 [INFO] 127.0.0.1 - - [30/Sep/2026 05:12:54] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 38.47it/s]
+2026-09-30 05:12:54,914 [INFO] 127.0.0.1 - - [30/Sep/2026 05:12:54] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 37.73it/s]
+2026-09-30 05:13:13,320 [INFO] 127.0.0.1 - - [30/Sep/2026 05:13:13] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 37.65it/s]
+2026-09-30 05:13:13,395 [INFO] 127.0.0.1 - - [30/Sep/2026 05:13:13] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 46.35it/s]
+2026-09-30 05:13:13,451 [INFO] 127.0.0.1 - - [30/Sep/2026 05:13:13] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 38.47it/s]
+2026-09-30 05:13:13,505 [INFO] 127.0.0.1 - - [30/Sep/2026 05:13:13] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 99.97it/s]
+2026-09-30 05:13:13,552 [INFO] 127.0.0.1 - - [30/Sep/2026 05:13:13] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 66.66it/s]
+2026-09-30 05:13:13,601 [INFO] 127.0.0.1 - - [30/Sep/2026 05:13:13] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 71.44it/s]
+2026-09-30 05:13:13,644 [INFO] 127.0.0.1 - - [30/Sep/2026 05:13:13] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 66.66it/s]
+2026-09-30 05:13:13,685 [INFO] 127.0.0.1 - - [30/Sep/2026 05:13:13] "POST /v1/embeddings HTTP/1.1" 200 -
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 38.50it/s]
+2026-09-30 05:13:28,441 [INFO] 127.0.0.1 - - [30/Sep/2026 05:13:28] "POST /v1/embeddings HTTP/1.1" 200 -

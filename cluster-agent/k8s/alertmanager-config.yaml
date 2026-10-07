@@ -1,0 +1,151 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: monitoring  # Change to your Alertmanager namespace
+data:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+
+    # Route configuration
+    route:
+      group_by: ['alertname', 'cluster', 'namespace']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 12h
+      receiver: 'devopscopilot-webhook'
+
+      # Route all alerts to DevOpsCopilot
+      routes:
+      - match:
+          severity: critical
+        receiver: 'devopscopilot-webhook'
+        continue: true
+      - match:
+          severity: warning
+        receiver: 'devopscopilot-webhook'
+        continue: true
+      - receiver: 'devopscopilot-webhook'
+
+    # Receivers
+    receivers:
+    - name: 'devopscopilot-webhook'
+      webhook_configs:
+      - url: 'http://devopscopilot-cluster-agent.devopscopilot.svc.cluster.local:8080/webhook/alerts'
+        send_resolved: true
+        max_alerts: 0  # Send all alerts
+        http_config:
+          follow_redirects: true
+
+    # Inhibition rules
+    inhibit_rules:
+    - source_match:
+        severity: 'critical'
+      target_match:
+        severity: 'warning'
+      equal: ['alertname', 'cluster', 'namespace']
+
+---
+# Example Prometheus alert rules for testing
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alert-rules
+  namespace: monitoring  # Change to your Prometheus namespace
+data:
+  alert-rules.yml: |
+    groups:
+    - name: kubernetes-pod-alerts
+      interval: 30s
+      rules:
+
+      # Pod crash looping
+      - alert: PodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
+          description: "Pod has restarted {{ $value }} times in the last 5 minutes"
+
+      # High memory usage
+      - alert: PodMemoryHigh
+        expr: |
+          (container_memory_working_set_bytes{container!=""}
+          / on(pod, namespace) kube_pod_container_resource_limits{resource="memory"})
+          > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} memory usage > 90%"
+          description: "Pod is using {{ $value | humanizePercentage }} of its memory limit"
+
+      # High CPU usage
+      - alert: PodCPUHigh
+        expr: |
+          (rate(container_cpu_usage_seconds_total{container!=""}[5m])
+          / on(pod, namespace) kube_pod_container_resource_limits{resource="cpu"})
+          > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} CPU usage > 90%"
+          description: "Pod is using {{ $value | humanizePercentage }} of its CPU limit"
+
+      # Pod not ready
+      - alert: PodNotReady
+        expr: kube_pod_status_ready{condition="true"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} not ready"
+          description: "Pod has been in a not ready state for more than 5 minutes"
+
+      # Container OOMKilled
+      - alert: ContainerOOMKilled
+        expr: kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.namespace }}/{{ $labels.pod }}/{{ $labels.container }} was OOMKilled"
+          description: "Container was killed due to out of memory condition"
+
+    - name: kubernetes-node-alerts
+      interval: 30s
+      rules:
+
+      # Node not ready
+      - alert: NodeNotReady
+        expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node {{ $labels.node }} is not ready"
+          description: "Node has been in a not ready state for more than 5 minutes"
+
+      # Node disk pressure
+      - alert: NodeDiskPressure
+        expr: kube_node_status_condition{condition="DiskPressure",status="true"} == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node {{ $labels.node }} is under disk pressure"
+          description: "Node disk is running out of space"
+
+      # Node memory pressure
+      - alert: NodeMemoryPressure
+        expr: kube_node_status_condition{condition="MemoryPressure",status="true"} == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node {{ $labels.node }} is under memory pressure"
+          description: "Node is running low on memory"

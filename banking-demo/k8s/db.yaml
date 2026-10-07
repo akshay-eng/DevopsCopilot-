@@ -1,0 +1,97 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bank-db
+  namespace: banking-demo
+  labels:
+    app: bank-db
+    tier: database
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: bank-db
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bank-db
+  namespace: banking-demo
+  labels:
+    app: bank-db
+    tier: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bank-db
+  template:
+    metadata:
+      labels:
+        app: bank-db
+        tier: database
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: bankdb
+            - name: POSTGRES_USER
+              value: bankuser
+            - name: POSTGRES_PASSWORD
+              value: bankpass
+          resources:
+            requests:
+              memory: "20Mi"
+              cpu: "50m"
+            limits:
+              # Postgres uses ~30MB+ at runtime - 20Mi triggers kernel OOM killer
+              memory: "20Mi"
+              cpu: "100m"
+          volumeMounts:
+            - name: init-sql
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: init-sql
+          configMap:
+            name: bank-db-init
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bank-db-init
+  namespace: banking-demo
+data:
+  init.sql: |
+    CREATE TABLE IF NOT EXISTS accounts (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        balance DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS transactions (
+        id SERIAL PRIMARY KEY,
+        from_account_id INT REFERENCES accounts(id),
+        to_account_id INT REFERENCES accounts(id),
+        amount DECIMAL(12,2) NOT NULL,
+        type VARCHAR(20) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    INSERT INTO accounts (name, balance) VALUES
+        ('Alice Johnson', 5000.00),
+        ('Bob Smith', 3200.00),
+        ('Charlie Brown', 1500.00),
+        ('Diana Prince', 8700.00),
+        ('Eve Wilson', 4100.00);
+
+    INSERT INTO transactions (from_account_id, to_account_id, amount, type) VALUES
+        (1, 2, 500.00, 'transfer'),
+        (3, 1, 200.00, 'transfer'),
+        (NULL, 4, 1000.00, 'deposit'),
+        (2, NULL, 150.00, 'withdrawal');

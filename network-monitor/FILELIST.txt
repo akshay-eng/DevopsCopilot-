@@ -1,0 +1,68 @@
+network-monitor/
+├── README.md                      # Complete documentation
+├── QUICKSTART.md                  # 5-minute setup guide
+├── DEVELOPMENT.md                 # Developer guide
+├── PROJECT_SUMMARY.md             # High-level overview
+├── .gitignore                     # Git ignore rules
+│
+├── Dockerfile                     # Multi-stage build
+├── Makefile                       # Build automation
+├── go.mod                         # Go dependencies
+├── go.sum                         # Go checksums
+│
+├── bpf/                           # eBPF Programs (C)
+│   ├── packet_capture.bpf.c      # TC hooks + SSL uprobes
+│   └── vmlinux.h                 # Kernel type definitions
+│
+├── cmd/                           # Application Entry Point
+│   └── main.go                   # Main application logic
+│
+├── pkg/                           # Go Packages
+│   ├── ebpf/
+│   │   └── loader.go             # eBPF program loader & event handler
+│   ├── http/
+│   │   └── parser.go             # HTTP request/response parser
+│   ├── k8s/
+│   │   └── cache.go              # Kubernetes metadata cache
+│   ├── kafka/
+│   │   └── producer.go           # Kafka event producer
+│   └── graph/
+│       └── service_graph.go      # Neo4j service dependency graph
+│
+├── deployments/                   # Kubernetes Manifests
+│   ├── daemonset.yaml            # Main DaemonSet deployment
+│   ├── kafka-example.yaml        # Kafka deployment (Strimzi)
+│   └── neo4j-example.yaml        # Neo4j deployment
+│
+├── scripts/                       # Build & Deploy Scripts
+│   ├── build.sh                  # Build eBPF + Go binary
+│   └── deploy.sh                 # Deploy to Kubernetes
+│
+└── docs/                          # Documentation
+    ├── neo4j-queries.md          # Neo4j Cypher query examples
+    └── ARCHITECTURE.md           # Detailed architecture diagrams
+
+TOTAL FILES: 24
+LINES OF CODE:
+  - eBPF (C):     ~500 lines
+  - Go:          ~1500 lines
+  - YAML:         ~300 lines
+  - Documentation: ~2000 lines
+  - Total:        ~4300 lines
+
+KEY FEATURES:
+✓ eBPF TC hooks for packet capture
+✓ eBPF SSL uprobes for TLS decryption
+✓ HTTP/HTTPS parsing
+✓ Kubernetes metadata enrichment
+✓ Kafka event export
+✓ Neo4j service graph
+✓ DaemonSet deployment
+✓ Complete documentation
+
+DEPENDENCIES:
+- Kernel 4.18+ with BTF
+- Go 1.21+
+- Kafka cluster
+- Neo4j database
+- Kubernetes 1.20+

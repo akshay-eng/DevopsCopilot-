@@ -1,0 +1,222 @@
+# OpenCost — CNCF Kubernetes cost monitoring (the open-source core of Kubecost).
+#
+# Chosen because it is genuinely lightweight: one Deployment (~100m CPU / 200Mi),
+# no database of its own, and it reuses the Prometheus already running in this
+# cluster instead of standing up a second one.
+#
+# ─────────────────────────── READ THIS FIRST ───────────────────────────
+# This is a BARE-METAL / on-prem cluster. OpenCost normally derives node prices
+# from a cloud provider's billing API; there isn't one here, so every figure
+# comes from the custom price list in the ConfigMap below. Those numbers are
+# PLACEHOLDERS. Until you replace them with your real amortised cost per
+# core-hour and per GB-hour, the dashboard is showing you arithmetic, not spend.
+#
+# Install:
+#   kubectl create namespace opencost
+#   kubectl apply -f k8s-configs/opencost/opencost.yaml
+#
+# Verify:
+#   kubectl -n opencost rollout status deploy/opencost
+#   kubectl -n opencost port-forward svc/opencost 9003:9003
+#   curl 'localhost:9003/allocation/compute?window=1h&aggregate=namespace'
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: opencost
+  namespace: opencost
+  labels:
+    app.kubernetes.io/name: opencost
+    app.kubernetes.io/part-of: devopscopilot
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: opencost
+  labels:
+    app.kubernetes.io/name: opencost
+    app.kubernetes.io/part-of: devopscopilot
+rules:
+  # Read-only throughout: OpenCost only ever observes. Nothing here grants write,
+  # so it cannot alter workloads even if compromised.
+  - apiGroups: [""]
+    resources:
+      - configmaps
+      - nodes
+      - pods
+      - services
+      - resourcequotas
+      - replicationcontrollers
+      - limitranges
+      - persistentvolumeclaims
+      - persistentvolumes
+      - namespaces
+      - endpoints
+      - events
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets", "deployments", "daemonsets", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["cronjobs", "jobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: opencost
+  labels:
+    app.kubernetes.io/name: opencost
+    app.kubernetes.io/part-of: devopscopilot
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: opencost
+subjects:
+  - kind: ServiceAccount
+    name: opencost
+    namespace: opencost
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opencost-pricing
+  namespace: opencost
+  labels:
+    app.kubernetes.io/name: opencost
+    app.kubernetes.io/part-of: devopscopilot
+data:
+  # All rates are USD per unit per HOUR.
+  #
+  # How to derive your real numbers: take the fully amortised monthly cost of a
+  # node (hardware depreciation + power + cooling + rack + support), divide by
+  # 730 hours, then split that hourly figure across CPU and RAM — roughly 70/30
+  # is a common starting point — and divide each part by the node's core count
+  # and GB of RAM respectively.
+  #
+  # Worked example for this cluster (40 cores, 94 GiB across 3 nodes):
+  #   $1,500/month total  ->  $2.055/hour
+  #   CPU  70% = $1.438/hr  /  40 cores  = $0.0360 per core-hour
+  #   RAM  30% = $0.617/hr  /  94 GB     = $0.0066 per GB-hour
+  default.json: |
+    {
+      "description": "PLACEHOLDER on-prem rates - replace with your real amortised costs",
+      "CPU": "0.0360",
+      "spotCPU": "0.0360",
+      "RAM": "0.0066",
+      "spotRAM": "0.0066",
+      "GPU": "0.0000",
+      "storage": "0.00005479452",
+      "zoneNetworkEgress": "0.00",
+      "regionNetworkEgress": "0.00",
+      "internetNetworkEgress": "0.00"
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opencost
+  namespace: opencost
+  labels:
+    app.kubernetes.io/name: opencost
+    app.kubernetes.io/part-of: devopscopilot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opencost
+  template:
+    metadata:
+      labels:
+        app: opencost
+        app.kubernetes.io/name: opencost
+    spec:
+      serviceAccountName: opencost
+      containers:
+        - name: opencost
+          image: ghcr.io/opencost/opencost:1.113.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 9003
+            - name: metrics
+              containerPort: 9090
+          env:
+            # Reuse the cluster's existing Prometheus rather than running another.
+            - name: PROMETHEUS_SERVER_ENDPOINT
+              value: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
+            - name: CLOUD_PROVIDER_API_KEY
+              value: ""
+            # Makes OpenCost read the custom price list mounted below instead of
+            # trying to reach a cloud billing API.
+            - name: CONFIG_PATH
+              value: /models/
+            - name: CLUSTER_ID
+              value: "devopscopilot"
+            - name: LOG_LEVEL
+              value: "info"
+          volumeMounts:
+            - name: pricing
+              mountPath: /models
+          resources:
+            requests:
+              cpu: 50m
+              memory: 150Mi
+            limits:
+              cpu: 500m
+              memory: 500Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 9003
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9003
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1001
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: pricing
+          configMap:
+            name: opencost-pricing
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opencost
+  namespace: opencost
+  labels:
+    app.kubernetes.io/name: opencost
+    app.kubernetes.io/part-of: devopscopilot
+spec:
+  type: ClusterIP
+  selector:
+    app: opencost
+  ports:
+    - name: http
+      port: 9003
+      targetPort: 9003
+    - name: metrics
+      port: 9090
+      targetPort: 9090

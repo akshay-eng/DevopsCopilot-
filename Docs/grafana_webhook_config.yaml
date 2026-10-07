@@ -1,0 +1,27 @@
+install kafka 
+
+# . Configure Grafana:
+
+# Place the contact point YAML in /etc/grafana/provisioning/alerting/
+# Place the alert rules YAML in /etc/grafana/provisioning/alerting/
+# Restart Grafana
+
+
+grafana -> connectors> kafka rest proxy
+
+
+docker run -d \
+  --name kafka-rest-proxy \
+  --network host \
+  -e KAFKA_REST_HOST_NAME=localhost \
+  -e KAFKA_REST_BOOTSTRAP_SERVERS=172.17.204.8:9092 \
+  -e KAFKA_REST_LISTENERS=http://0.0.0.0:8082 \
+  confluentinc/cp-kafka-rest:latest
+
+
+
+# Check REST Proxy health
+curl http://localhost:8082/
+
+# List topics
+curl http://localhost:8082/topics

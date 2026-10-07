@@ -1,0 +1,71 @@
+prometheus:
+  service:
+    type: NodePort
+    nodePort: 32738
+  prometheusSpec:
+    retention: 12h
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 100m
+      limits:
+        memory: 512Mi
+        cpu: 500m
+    # Scrape all pods/services across all namespaces
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+
+grafana:
+  enabled: false
+
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    resources:
+      requests:
+        memory: 64Mi
+        cpu: 10m
+      limits:
+        memory: 128Mi
+        cpu: 100m
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['alertname', 'namespace']
+      group_wait: 10s
+      group_interval: 30s
+      repeat_interval: 1h
+      receiver: alert-webhook
+      routes:
+        - receiver: 'null'
+          matchers:
+            - alertname = Watchdog
+    receivers:
+      - name: 'null'
+      - name: alert-webhook
+        webhook_configs:
+          - url: 'http://alert-webhook-service.alerts.svc.cluster.local:8080/webhook/alerts'
+            send_resolved: true
+    inhibit_rules:
+      - source_matchers:
+          - severity = critical
+        target_matchers:
+          - severity = warning
+        equal: [namespace, pod]
+
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true
+
+# Reduce resource usage
+prometheusOperator:
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 50m
+    limits:
+      memory: 256Mi
+      cpu: 200m

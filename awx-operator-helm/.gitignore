@@ -1,0 +1,18 @@
+*~
+gh-pages/
+.cache/
+/bin
+/bundle
+/bundle_tmp*
+/bundle.Dockerfile
+/.cr-release-packages
+.vscode/
+__pycache__
+/site
+venv/*
+.vscode
+site/
+# ignore files copied in from awx-operator
+Dockerfile
+requirements.yml
+watches.yaml

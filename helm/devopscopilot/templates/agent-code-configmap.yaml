@@ -1,0 +1,12 @@
+{{- if eq .Values.agent.mode "bundled" }}
+# Bundled mode only: ship the agent source so no image build/registry is needed.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "devopscopilot.fullname" . }}-agent-code
+  labels:
+    {{- include "devopscopilot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cluster-agent
+data:
+{{ (.Files.Glob "files/*").AsConfig | indent 2 }}
+{{- end }}

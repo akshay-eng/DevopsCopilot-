@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "devopscopilot.fullname" . }}-agent
+  labels:
+    {{- include "devopscopilot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cluster-agent
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "devopscopilot.agent.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.agent.service.port }}
+      targetPort: 8080
+      protocol: TCP

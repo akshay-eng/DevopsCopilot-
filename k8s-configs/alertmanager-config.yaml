@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+data:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+
+    # Define the webhook receiver
+    receivers:
+      - name: 'null'
+      - name: 'devopscopilot-webhook'
+        webhook_configs:
+          - url: 'http://192.168.1.105:5001/api/webhook/alerts'
+            send_resolved: true
+            http_config:
+              follow_redirects: true
+            max_alerts: 0  # Send all alerts, no limit
+
+    # Route configuration
+    route:
+      group_by: ['alertname', 'cluster', 'service']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 12h
+      receiver: 'devopscopilot-webhook'
+
+      # Child routes for specific alert handling
+      routes:
+        # Critical alerts - send immediately
+        - match:
+            severity: critical
+          receiver: 'devopscopilot-webhook'
+          group_wait: 0s
+          repeat_interval: 5m
+
+        # Warning alerts - group for 30s before sending
+        - match:
+            severity: warning
+          receiver: 'devopscopilot-webhook'
+          group_wait: 30s
+          repeat_interval: 30m
+
+        # Info alerts - group for 5m before sending
+        - match:
+            severity: info
+          receiver: 'devopscopilot-webhook'
+          group_wait: 5m
+          repeat_interval: 2h
+
+    # Inhibition rules - suppress certain alerts when others are firing
+    inhibit_rules:
+      # Suppress warning alerts if critical alert is firing for same resource
+      - source_match:
+          severity: 'critical'
+        target_match:
+          severity: 'warning'
+        equal: ['alertname', 'namespace', 'pod']
