@@ -83,6 +83,13 @@ const alertSchema = new mongoose.Schema({
     default: null
   },
 
+  // How this alert was resolved — written by the agent resolution flow so the
+  // alert details can show what was actually done, not just that it closed.
+  resolution: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
+  },
+
   // For TTL expiration
   createdAt: {
     type: Date,

@@ -7,7 +7,12 @@
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
-  "keywords": ["alertmanager", "webhook", "kafka", "kubernetes"],
+  "keywords": [
+    "alertmanager",
+    "webhook",
+    "kafka",
+    "kubernetes"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {

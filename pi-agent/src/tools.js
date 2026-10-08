@@ -10,6 +10,7 @@
  */
 
 import { Type } from '@mariozechner/pi-ai';
+import { requestApproval, recordAction } from './threads.js';
 
 function text(t) { return { content: [{ type: 'text', text: typeof t === 'string' ? t : JSON.stringify(t, null, 2) }] }; }
 
@@ -77,7 +78,7 @@ export async function buildIntegrationTools({ platformUrl, authToken }) {
   return tools;
 }
 
-export function buildTools({ platformUrl, authToken, clusterId }) {
+export function buildTools({ platformUrl, authToken, clusterId, threadId }) {
   const call = async (method, pathAndQuery, body) => {
     const res = await fetch(`${platformUrl}${pathAndQuery}`, {
       method,
@@ -107,13 +108,42 @@ export function buildTools({ platformUrl, authToken, clusterId }) {
     },
     {
       name: 'list_resources',
-      description: 'List Kubernetes resources of a given type in a namespace.',
+      description: 'List Kubernetes resources of a given type in a namespace. '
+        + 'Use pvc/pv/sc when a pod is Pending on storage, and nodes when it is Pending on scheduling.',
       parameters: Type.Object({
-        resourceType: Type.String({ description: "pods | deployments | services | statefulsets | daemonsets" }),
-        namespace: Type.String({ description: 'Namespace name', default: 'default' }),
+        resourceType: Type.String({
+          description: 'pods | deployments | services | statefulsets | daemonsets | jobs | cronjobs '
+            + '| pvc | pv | sc | nodes | events',
+        }),
+        namespace: Type.String({ description: "Namespace name, or 'all'", default: 'default' }),
       }),
       execute: async (_id, p) =>
         text(await call('GET', `/api/clusters/${requireCluster()}/resources/${p.resourceType}?namespace=${encodeURIComponent(p.namespace || 'default')}`)),
+    },
+    {
+      // The single most useful diagnostic in Kubernetes. A Pending pod or an
+      // unbound PVC states its reason here and nowhere else, so without this
+      // the agent can only guess at causes.
+      name: 'get_events',
+      description: 'Kubernetes events for a namespace, warnings first. ALWAYS read these before theorising about '
+        + 'why something is Pending, unschedulable, failing to mount, or crash-looping — the reason is usually stated here verbatim.',
+      parameters: Type.Object({
+        namespace: Type.String({ description: "Namespace name, or 'all'", default: 'all' }),
+      }),
+      execute: async (_id, p) =>
+        text(await call('GET', `/api/clusters/${requireCluster()}/resources/events?namespace=${encodeURIComponent(p.namespace || 'all')}`)),
+    },
+    {
+      name: 'describe_resource',
+      description: 'Full detail for one resource (the equivalent of `kubectl describe`): spec, status and conditions. '
+        + 'Use after list_resources narrows it down to the object that is actually broken.',
+      parameters: Type.Object({
+        resourceType: Type.String({ description: 'pod | deployment | statefulset | daemonset | service | job | cronjob' }),
+        namespace: Type.String(),
+        name: Type.String(),
+      }),
+      execute: async (_id, p) =>
+        text(await call('GET', `/api/clusters/${requireCluster()}/resources/${p.resourceType}/${encodeURIComponent(p.namespace)}/${encodeURIComponent(p.name)}`)),
     },
     {
       name: 'get_pod_logs',
@@ -322,6 +352,84 @@ export function buildTools({ platformUrl, authToken, clusterId }) {
         plan: p.plan, reason: p.reason, riskLevel: p.riskLevel,
       })),
     },
+    // ---- remediation ----------------------------------------------------
+    // These change a live cluster. Every one of them stops and asks a person
+    // first, through the Agent Threads page, and a refusal (or an unanswered
+    // request) means the action does not happen. The model is told the outcome
+    // either way so it can adapt rather than silently retrying.
+    ...[
+      {
+        name: 'restart_workload',
+        description: 'Rolling-restart the Deployment/StatefulSet/DaemonSet that owns a pod. Use for stuck, wedged or crash-looping workloads. Requires operator approval.',
+        parameters: Type.Object({
+          namespace: Type.String(),
+          name: Type.String({ description: 'Pod or workload name' }),
+          kind: Type.Optional(Type.String({ description: 'pod | deployment | statefulset | daemonset', default: 'pod' })),
+          reason: Type.String({ description: 'Why this fixes the alert — shown to the approver' }),
+        }),
+      },
+      {
+        name: 'delete_pod',
+        description: 'Delete a single pod so its controller recreates it. Narrowest possible fix for one bad replica. Requires operator approval.',
+        parameters: Type.Object({
+          namespace: Type.String(),
+          name: Type.String({ description: 'Pod name' }),
+          reason: Type.String({ description: 'Why this fixes the alert — shown to the approver' }),
+        }),
+      },
+      {
+        name: 'delete_unbound_pvc',
+        description: 'Delete a PersistentVolumeClaim that is Pending and never bound, so its controller recreates it '
+          + 'from the current template. This is the fix when a claim references a StorageClass that does not exist or '
+          + 'was wrong, because spec.storageClassName cannot be changed in place. '
+          + 'REFUSED automatically if the claim is Bound — a bound claim holds data. Requires operator approval.',
+        parameters: Type.Object({
+          namespace: Type.String(),
+          name: Type.String({ description: 'PersistentVolumeClaim name, e.g. data-redis-0' }),
+          reason: Type.String({ description: 'Why this fixes the alert — shown to the approver' }),
+        }),
+      },
+      {
+        name: 'scale_workload',
+        description: 'Change a workload replica count. Use when an alert is caused by too few (or zero) replicas. Requires operator approval.',
+        parameters: Type.Object({
+          namespace: Type.String(),
+          name: Type.String(),
+          replicas: Type.Number(),
+          kind: Type.Optional(Type.String({ default: 'deployment' })),
+          reason: Type.String({ description: 'Why this fixes the alert — shown to the approver' }),
+        }),
+      },
+    ].map((spec) => ({
+      ...spec,
+      execute: async (_id, p) => {
+        const { reason, ...params } = p;
+        const plan = await call('POST', '/api/remediation/describe', { action: spec.name, params });
+        const described = plan?.describe || {};
+
+        const verdict = await requestApproval(threadId, {
+          action: spec.name,
+          summary: described.summary || `${spec.name} ${params.name} in ns/${params.namespace}`,
+          risk: described.risk,
+          reversible: described.reversible,
+          params: { ...params, reason },
+        });
+
+        if (!verdict.approved) {
+          recordAction(threadId, { action: spec.name, params, status: 'refused', detail: verdict.reason });
+          return text({
+            applied: false,
+            refused: true,
+            reason: verdict.reason,
+            guidance: 'The operator did not approve this. Do not retry it; either propose a different action or report what a human should do by hand.',
+          });
+        }
+
+        const result = await call('POST', '/api/remediation/apply', { action: spec.name, params, reason });
+        recordAction(threadId, { action: spec.name, params, status: 'applied', detail: result?.result?.detail, verify: result?.result?.verify });
+        return text({ applied: true, ...result });
+      },
+    })),
     {
       name: 'process_correlation',
       description: 'One shot: raise the ServiceNow incident for a correlated alert group and, if remediation mutates production, raise the change request too.',

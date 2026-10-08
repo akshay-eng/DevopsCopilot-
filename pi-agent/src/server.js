@@ -137,7 +137,7 @@ async function runAgent({ message, modelProvider, clusterId, authToken, userId, 
   try {
     const { cfg, model } = resolveModel(modelProvider);
     // Platform tools + one tool per action of every connected integration.
-    const platformTools = buildTools({ platformUrl: PLATFORM_API_URL, authToken, clusterId });
+    const platformTools = buildTools({ platformUrl: PLATFORM_API_URL, authToken, clusterId, threadId: thread.id });
     const integrationTools = await buildIntegrationTools({ platformUrl: PLATFORM_API_URL, authToken });
     const tools = [...platformTools, ...integrationTools];
     if (integrationTools.length) {
@@ -221,6 +221,95 @@ app.get('/api/threads/:id', (req, res) => {
   const t = threads.getThread(req.params.id);
   if (!t) return res.status(404).json({ success: false, error: 'Thread not found' });
   res.json({ success: true, thread: t });
+});
+
+// ---- Human approval ------------------------------------------------------
+// A mutating tool parks here until a person answers. Both endpoints are plain
+// JSON (not SSE) so the Agent Threads page can poll and answer them directly.
+
+app.get('/api/approvals', (req, res) => {
+  res.json({ success: true, approvals: threads.listPendingApprovals({ userId: req.query.userId }) });
+});
+
+app.post('/api/approvals/:id', (req, res) => {
+  const { approved, by, reason } = req.body || {};
+  if (typeof approved !== 'boolean') {
+    return res.status(400).json({ success: false, error: 'approved must be true or false' });
+  }
+  const ok = threads.decideApproval(req.params.id, { approved, by, reason });
+  if (!ok) {
+    return res.status(404).json({ success: false, error: 'No pending approval with that id (it may have been answered or expired).' });
+  }
+  res.json({ success: true });
+});
+
+// ---- Alert resolution ----------------------------------------------------
+// The agent investigates one alert and fixes it if it safely can. Mutating
+// steps stop for approval; the run streams like any other so the Threads page
+// shows the work as it happens.
+app.post('/api/agent/resolve-alert', (req, res) => {
+  const { alert } = req.body || {};
+  if (!alert || !alert.alertname) {
+    return res.status(400).json({ success: false, error: 'alert (with alertname) is required' });
+  }
+
+  const facts = [
+    `Alert: ${alert.alertname}`,
+    alert.severity ? `Severity: ${alert.severity}` : null,
+    alert.namespace ? `Namespace: ${alert.namespace}` : null,
+    alert.pod && alert.pod !== 'N/A' ? `Pod: ${alert.pod}` : null,
+    alert.node ? `Node: ${alert.node}` : null,
+    alert.message ? `Message: ${alert.message}` : null,
+    alert.startsAt ? `Started: ${alert.startsAt}` : null,
+  ].filter(Boolean).join('\n');
+
+  runAgent({
+    ...req.body,
+    kind: 'resolve',
+    message: `Resolve this alert.\n\n${facts}`,
+    extraSystem: [
+      'TASK: resolve the alert above on the live cluster.',
+      '',
+      'STEP 1 — FIND THE REAL OBJECT.',
+      'The pod named on an alert is often the EXPORTER that reported it, not the thing that is broken.',
+      'Read the alert description: it names the actual resource (e.g. "PVC data-redis-0 is stuck Pending"',
+      'means investigate the PVC data-redis-0, NOT the kube-state-metrics pod that emitted the alert).',
+      '',
+      'STEP 2 — READ THE EVIDENCE BEFORE THEORISING.',
+      'Call get_events for the namespace FIRST. Kubernetes states the reason verbatim there',
+      '("no persistent volumes available for this claim", "Insufficient cpu", "0/3 nodes are available...").',
+      'Then use list_resources with the right type for the symptom:',
+      '  Pending pod on storage  -> pvc, then pv, then sc (is there a default StorageClass? a matching PV?)',
+      '  Pending pod on scheduling -> nodes (taints, allocatable), then describe_resource on the pod',
+      '  CrashLoop / not ready   -> get_pod_logs, then describe_resource',
+      'Never attribute a cause you have not seen in events, logs or resource status.',
+      '',
+      'STEP 3 — FIX IT IF YOU SAFELY CAN.',
+      'Use restart_workload, delete_pod or scale_workload. Each asks a human first; if they refuse,',
+      'do not retry — say what a human should do by hand.',
+      'Think about whether the action can even work: deleting a Pending pod does NOT fix an unbound PVC,',
+      'because the replacement will be Pending for exactly the same reason. If no available action fixes',
+      'the cause, say so instead of applying one that cannot help.',
+      '',
+      'STEP 4 — RECORD IT IN SERVICENOW.',
+      'You have snow_search_records, snow_update_ticket, snow_create_incident and snow_create_change_request.',
+      'Search for an existing incident for this alert before creating anything. If you fixed it, update the',
+      'ticket with what you did. If it needs a human, update it with your findings so they do not start from zero.',
+      '',
+      'STEP 5 — VERIFY. Re-read the object state and say whether it actually recovered.',
+      '',
+      'Rules:',
+      '- Never claim you fixed something you did not verify.',
+      '- Do not blame unrelated firing alerts for this one. etcd or control-plane alerts firing elsewhere are',
+      '  NOT the cause of a storage or scheduling failure unless events say so.',
+      '- If the cause is outside the cluster, say so and stop rather than restarting things hopefully.',
+      '- Some alerts need no action (inhibitors, watchdogs, info). Say that plainly instead of inventing work.',
+      '',
+      'Finish with a section headed exactly "RESOLUTION SUMMARY" containing:',
+      'What was wrong / What I did / Whether it is fixed / What to watch.',
+      'Keep it under 200 words — it is shown directly in the alert details.',
+    ].join('\n'),
+  }, res);
 });
 
 // ---- Agent chat (drop-in for deep-agent) --------------------------------

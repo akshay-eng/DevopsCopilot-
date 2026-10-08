@@ -87,6 +87,22 @@ const correlatedIncidentSchema = new mongoose.Schema({
     createdAt: Date,
   },
 
+  // Human-readable incident narrative, written once from the correlated
+  // evidence and then left alone. Regenerating it on every correlation pass
+  // would make the same incident read differently each time it is re-observed,
+  // and would re-spend model time on an answer that has not changed.
+  title: { type: String, default: '' },
+  description: { type: String, default: '' },
+  narrativeSource: { type: String, enum: ['ai', 'template', ''], default: '' },
+  narrativeAt: Date,
+
+  // Distinct ongoing conditions vs total notifications received.
+  conditionCount: { type: Number, default: 0 },
+  occurrenceCount: { type: Number, default: 0 },
+  nodes: [String],
+  workloads: [String],
+  families: [String],
+
   // Cron job reference
   cronJobId: { type: String, default: null },
 }, {

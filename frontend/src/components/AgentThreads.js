@@ -3,7 +3,7 @@ import { useTheme } from '../context/ThemeContext';
 import { backendApi } from '../services/api';
 import {
   Activity, CheckCircle2, XCircle, Loader2, Wrench, ChevronDown, ChevronRight,
-  RefreshCw, Cpu, Clock, Zap, AlertTriangle,
+  RefreshCw, Cpu, Clock, Zap, AlertTriangle, ShieldQuestion,
 } from 'lucide-react';
 
 const fmtDur = (ms) => {
@@ -31,12 +31,32 @@ const AgentThreads = () => {
   const [auto, setAuto] = useState(true);
   const [filter, setFilter] = useState('all');
 
+  const [approvals, setApprovals] = useState([]);
+  const [deciding, setDeciding] = useState(null);
+
   const load = useCallback(async () => {
     try {
       const r = await backendApi.get('/api/agent-threads?limit=60');
       if (r?.success) setData(r);
     } catch (e) { /* keep last */ } finally { setLoading(false); }
+    try {
+      const a = await backendApi.get('/api/agent-threads/approvals');
+      if (a?.success) setApprovals(a.approvals || []);
+    } catch (e) { /* keep last */ }
   }, []);
+
+  // Answering unblocks a run that is sitting waiting, so refresh straight after
+  // rather than waiting for the next poll tick.
+  const decide = useCallback(async (id, approved) => {
+    setDeciding(id);
+    try {
+      await backendApi.post(`/api/agent-threads/approvals/${id}`, { approved });
+      setApprovals((prev) => prev.filter((x) => x.id !== id));
+      load();
+    } catch (e) {
+      console.error('Approval failed:', e);
+    } finally { setDeciding(null); }
+  }, [load]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -107,6 +127,54 @@ const AgentThreads = () => {
               <p className={`text-[12.5px] mt-0.5 ${dk ? 'text-amber-200/80' : 'text-amber-700'}`}>
                 Start the Pi agent (<code>cd pi-agent &amp;&amp; npm start</code>) and point <code>DEEP_AGENT_URL</code> at it. Threads appear here as soon as it runs a task.
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* Approvals — the agent is blocked until one of these is answered, so
+            they sit above everything else on the page. */}
+        {approvals.length > 0 && (
+          <div className={`rounded-2xl overflow-hidden ${dk ? 'bg-amber-500/5 border border-amber-500/25' : 'bg-amber-50 border border-amber-200'}`}>
+            <div className="px-5 py-3 flex items-center gap-2">
+              <ShieldQuestion size={16} className="text-amber-500" />
+              <span className={`text-[14px] font-semibold ${dk ? 'text-amber-200' : 'text-amber-900'}`}>
+                {approvals.length} action{approvals.length > 1 ? 's' : ''} waiting for your approval
+              </span>
+            </div>
+            <div className={`divide-y ${dk ? 'divide-amber-500/15' : 'divide-amber-200'}`}>
+              {approvals.map((a) => (
+                <div key={a.id} className="px-5 py-4">
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="min-w-0">
+                      <div className={`text-[13.5px] font-medium ${dk ? 'text-amber-100' : 'text-amber-900'}`}>{a.summary}</div>
+                      <div className={`text-[12px] mt-1 flex items-center gap-3 flex-wrap ${dk ? 'text-amber-200/70' : 'text-amber-700'}`}>
+                        <span className="font-mono">{a.action}</span>
+                        <span>risk: {a.risk}</span>
+                        <span>{a.reversible ? 'reversible' : 'NOT reversible'}</span>
+                      </div>
+                      {a.params?.reason && (
+                        <div className={`text-[12.5px] mt-2 ${dk ? 'text-amber-200/90' : 'text-amber-800'}`}>
+                          Why: {a.params.reason}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => decide(a.id, false)}
+                        disabled={deciding === a.id}
+                        className={`px-3 py-1.5 rounded-lg text-[12.5px] font-medium border disabled:opacity-50 ${dk ? 'border-[#2d2d2d] text-gray-300' : 'border-gray-300 text-gray-700 bg-white'}`}>
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => decide(a.id, true)}
+                        disabled={deciding === a.id}
+                        className="px-3 py-1.5 rounded-lg text-[12.5px] font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50">
+                        {deciding === a.id ? 'Sending…' : 'Approve'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

@@ -12,6 +12,13 @@
  */
 
 const k8s = require('@kubernetes/client-node');
+
+/**
+ * client-node@0.21 returns { response, body }; newer majors return the object
+ * directly. Accept either so a future upgrade does not silently empty every
+ * enrichment field again.
+ */
+const unwrap = (res) => (res && res.body !== undefined ? res.body : res) || {};
 const axios = require('axios');
 
 // Error/warning patterns for log analysis
@@ -184,13 +191,13 @@ class AlertEnricher {
     try {
       let resource;
       if (resourceType === 'pod') {
-        const resp = await this.coreV1Api.readNamespacedPod({ name, namespace });
+        const resp = unwrap(await this.coreV1Api.readNamespacedPod(name, namespace));
         resource = resp;
       } else if (resourceType === 'node') {
-        const resp = await this.coreV1Api.readNode({ name });
+        const resp = unwrap(await this.coreV1Api.readNode(name));
         resource = resp;
       } else if (resourceType === 'pvc') {
-        const resp = await this.coreV1Api.readNamespacedPersistentVolumeClaim({ name, namespace });
+        const resp = unwrap(await this.coreV1Api.readNamespacedPersistentVolumeClaim(name, namespace));
         resource = resp;
       } else {
         return { error: `Unsupported resource type: ${resourceType}` };
@@ -332,13 +339,13 @@ class AlertEnricher {
   async fetchResourceGet(namespace, resourceType, name) {
     try {
       if (resourceType === 'pod') {
-        const resp = await this.coreV1Api.readNamespacedPod({ name, namespace });
+        const resp = unwrap(await this.coreV1Api.readNamespacedPod(name, namespace));
         return { kind: 'Pod', metadata: resp.metadata, spec: resp.spec, status: resp.status };
       } else if (resourceType === 'node') {
-        const resp = await this.coreV1Api.readNode({ name });
+        const resp = unwrap(await this.coreV1Api.readNode(name));
         return { kind: 'Node', metadata: resp.metadata, spec: resp.spec, status: resp.status };
       } else if (resourceType === 'pvc') {
-        const resp = await this.coreV1Api.readNamespacedPersistentVolumeClaim({ name, namespace });
+        const resp = unwrap(await this.coreV1Api.readNamespacedPersistentVolumeClaim(name, namespace));
         return { kind: 'PersistentVolumeClaim', metadata: resp.metadata, spec: resp.spec, status: resp.status };
       }
       return { error: `Unsupported resource type: ${resourceType}` };
@@ -354,19 +361,16 @@ class AlertEnricher {
   async fetchCurrentLogs(namespace, podName, tailLines = 200) {
     try {
       // First get the pod to enumerate containers
-      const pod = await this.coreV1Api.readNamespacedPod({ name: podName, namespace });
+      const pod = unwrap(await this.coreV1Api.readNamespacedPod(podName, namespace));
       const containerNames = (pod.spec?.containers || []).map(c => c.name);
 
       const containers = [];
       for (const containerName of containerNames) {
         try {
-          const logs = await this.coreV1Api.readNamespacedPodLog({
-            name: podName,
-            namespace,
-            container: containerName,
-            tailLines,
-            timestamps: true
-          });
+          const logs = await this.coreV1Api.readNamespacedPodLog(
+            podName, namespace, containerName,
+            undefined, undefined, undefined, undefined, undefined, undefined,
+            tailLines, true);
 
           const logText = typeof logs === 'string' ? logs : (logs?.body || '');
           const lines = logText.split('\n').filter(l => l.length > 0);
@@ -399,20 +403,16 @@ class AlertEnricher {
 
   async fetchPreviousLogs(namespace, podName) {
     try {
-      const pod = await this.coreV1Api.readNamespacedPod({ name: podName, namespace });
+      const pod = unwrap(await this.coreV1Api.readNamespacedPod(podName, namespace));
       const containerNames = (pod.spec?.containers || []).map(c => c.name);
 
       const containers = [];
       for (const containerName of containerNames) {
         try {
-          const logs = await this.coreV1Api.readNamespacedPodLog({
-            name: podName,
-            namespace,
-            container: containerName,
-            previous: true,
-            tailLines: 200,
-            timestamps: true
-          });
+          const logs = await this.coreV1Api.readNamespacedPodLog(
+            podName, namespace, containerName,
+            undefined, undefined, undefined, undefined, true, undefined,
+            200, true);
 
           const logText = typeof logs === 'string' ? logs : (logs?.body || '');
           const lines = logText.split('\n').filter(l => l.length > 0);
@@ -450,9 +450,9 @@ class AlertEnricher {
     try {
       let eventList;
       if (namespace) {
-        eventList = await this.coreV1Api.listNamespacedEvent({ namespace, fieldSelector });
+        eventList = unwrap(await this.coreV1Api.listNamespacedEvent(namespace, undefined, undefined, undefined, fieldSelector));
       } else {
-        eventList = await this.coreV1Api.listEventForAllNamespaces({ fieldSelector });
+        eventList = unwrap(await this.coreV1Api.listEventForAllNamespaces(undefined, undefined, fieldSelector));
       }
 
       const cutoff = new Date(Date.now() - 30 * 60 * 1000);
@@ -488,7 +488,7 @@ class AlertEnricher {
 
     try {
       // ConfigMaps
-      const cmList = await this.coreV1Api.listNamespacedConfigMap({ namespace });
+      const cmList = unwrap(await this.coreV1Api.listNamespacedConfigMap(namespace));
       for (const cm of (cmList.items || [])) {
         const managed = cm.metadata?.managedFields || [];
         const lastUpdate = managed.reduce((latest, mf) => {
@@ -509,7 +509,7 @@ class AlertEnricher {
 
     try {
       // Secrets — metadata only, NEVER include .data
-      const secretList = await this.coreV1Api.listNamespacedSecret({ namespace });
+      const secretList = unwrap(await this.coreV1Api.listNamespacedSecret(namespace));
       for (const s of (secretList.items || [])) {
         const managed = s.metadata?.managedFields || [];
         const lastUpdate = managed.reduce((latest, mf) => {
@@ -531,7 +531,7 @@ class AlertEnricher {
 
     try {
       // Recent ReplicaSets (indicates deployments)
-      const rsList = await this.appsV1Api.listNamespacedReplicaSet({ namespace });
+      const rsList = unwrap(await this.appsV1Api.listNamespacedReplicaSet(namespace));
       for (const rs of (rsList.items || [])) {
         const created = rs.metadata?.creationTimestamp ? new Date(rs.metadata.creationTimestamp) : null;
         if (created && created > cutoff) {

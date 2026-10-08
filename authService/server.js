@@ -30,7 +30,9 @@ const documentsRoutes = require('./api/documentsRoutes');
 const vectorRoutes = require('./api/vectorRoutes');
 const costRoutes = require('./api/costRoutes');
 const complianceRoutes = require('./api/complianceRoutes');
+const fleetRoutes = require('./api/fleetRoutes');
 const agentThreadsRoutes = require('./api/agentThreadsRoutes');
+const remediationActionRoutes = require('./api/remediationActionRoutes');
 
 // Models
 const Alert = require('./models/Alert');
@@ -105,6 +107,24 @@ mongoose.connect(process.env.MONGO_DB_URI, {
       console.log(`🔥 Pre-warming timeline cache for ${users.length} user(s)`);
     } catch (e) {
       console.warn('⚠️ Cache pre-warm skipped:', e.message);
+    }
+
+    // Root-cause analysis for alert details, generated ahead of the click.
+    try {
+      const { startEnrichmentWarmer } = require('./jobs/enrichmentWarmer');
+      startEnrichmentWarmer();
+    } catch (e) {
+      console.warn('⚠️ Enrichment pre-generation skipped:', e.message);
+    }
+
+    // The fleet rollup reads every cluster (~10s cold), and the Trends page is
+    // the first thing most users open — so build it now rather than making that
+    // first visit pay for it.
+    try {
+      require('./api/fleetRoutes').warmFleetCache();
+      console.log('🔥 Pre-warming fleet rollup');
+    } catch (e) {
+      console.warn('⚠️ Fleet pre-warm skipped:', e.message);
     }
   })
   .catch((err) => {
@@ -318,7 +338,9 @@ app.use('/api/documents', documentsRoutes); // Finder-style SOPs & Reports docum
 app.use('/api/vectors', vectorRoutes); // Milvus knowledge base (tickets + correlated incidents)
 app.use('/api/cost', costRoutes); // OpenCost Kubernetes cost monitoring
 app.use('/api/compliance', complianceRoutes); // cluster compliance baselines + remediation
+app.use('/api/fleet', fleetRoutes); // fleet-wide rollup for the Trends dashboard
 app.use('/api/agent-threads', agentThreadsRoutes); // Live Pi agent task threads
+app.use('/api/remediation', remediationActionRoutes); // Cluster actions the agent applies (approval-gated)
 
 // ========================================
 // Direct Network Events Webhook (bypasses Kafka for real-time streaming)

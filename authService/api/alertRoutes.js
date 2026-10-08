@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const Alert = require('../models/Alert');
+const AlertResolution = require('../models/AlertResolution');
+const { resolveAlertWithAgent } = require('../services/alertResolutionService');
 const { protect } = require('../middleware/auth');
 
 let io;
@@ -216,6 +218,78 @@ router.post('/cache/invalidate', protect, async (req, res) => {
  *
  * Body: { clusterId, alertname, namespace? }
  */
+/**
+ * POST /api/alerts/agent-resolve
+ *
+ * The real Resolve: hand the alert to the agent, let it investigate and fix on
+ * the live cluster (asking for approval before anything mutating), then record
+ * the summary, update the runbook and close the ServiceNow incident.
+ *
+ * Long-running by nature — the agent reasons, calls tools and may wait on a
+ * human — so the client must be prepared to wait or to poll the thread.
+ */
+router.post('/agent-resolve', protect, async (req, res) => {
+  try {
+    const userId = req.user._id.toString();
+    const { alertId, clusterId, alertname, namespace, modelProvider, force } = req.body || {};
+
+    let alertDoc = null;
+    if (alertId) {
+      alertDoc = await Alert.findOne({ _id: alertId, userId });
+    }
+    if (!alertDoc && alertname) {
+      // Newest firing occurrence is the one worth acting on.
+      alertDoc = await Alert.findOne({
+        userId, alertname,
+        ...(clusterId ? { clusterId } : {}),
+        ...(namespace ? { namespace } : {}),
+        status: 'firing',
+      }).sort({ receivedAt: -1 });
+    }
+    if (!alertDoc) {
+      return res.status(404).json({ success: false, error: 'No matching firing alert found.' });
+    }
+
+    const authToken = req.headers.authorization?.replace('Bearer ', '');
+    const result = await resolveAlertWithAgent(alertDoc, {
+      userId, authToken,
+      clusterId: clusterId || alertDoc.clusterId,
+      modelProvider, force: Boolean(force),
+    });
+
+    invalidateTimelineGroupedCache(userId);
+    if (io && (result.outcome === 'remediated' || result.outcome === 'no-action-needed' || force)) {
+      io.to(`user-${userId}`).emit('alert-resolved', {
+        clusterId: alertDoc.clusterId, alertname: alertDoc.alertname,
+        namespace: alertDoc.namespace, endsAt: new Date().toISOString(),
+      });
+    }
+
+    res.json({ success: true, resolution: result });
+  } catch (error) {
+    console.error('[ERROR] Agent resolve failed:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/alerts/resolution?alertname=&namespace= — the latest agent run for an alert
+router.get('/resolution', protect, async (req, res) => {
+  try {
+    const { alertname, namespace, alertId } = req.query;
+    if (!alertname && !alertId) {
+      return res.status(400).json({ success: false, error: 'alertname or alertId is required' });
+    }
+    const q = { userId: req.user._id.toString() };
+    if (alertId) q.alertId = alertId; else q.alertname = alertname;
+    if (namespace) q.namespace = namespace;
+
+    const resolution = await AlertResolution.findOne(q).sort({ createdAt: -1 }).lean();
+    res.json({ success: true, resolution: resolution || null });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 router.post('/resolve', protect, async (req, res) => {
   try {
     const userId = req.user._id.toString();
@@ -968,7 +1042,9 @@ router.get('/for-correlation', protect, async (req, res) => {
     const alerts = await Alert.find(query)
       .sort({ createdAt: -1 })
       .limit(parsedLimit)
-      .select('alertname severity status pod namespace clusterId receivedAt startsAt endsAt message userId')
+      // node/labels/annotations were mapped below but never selected, so the
+      // correlator has been clustering on undefined for every one of them.
+      .select('alertname severity status pod namespace node labels annotations clusterId receivedAt startsAt endsAt message userId')
       .maxTimeMS(90000)
       .lean();
 

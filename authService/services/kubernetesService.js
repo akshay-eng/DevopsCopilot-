@@ -18,6 +18,7 @@ function getK8sClient() {
     coreApi: kc.makeApiClient(k8s.CoreV1Api),
     appsApi: kc.makeApiClient(k8s.AppsV1Api),
     batchApi: kc.makeApiClient(k8s.BatchV1Api),
+    storageApi: kc.makeApiClient(k8s.StorageV1Api),
   };
 }
 
@@ -116,7 +117,7 @@ async function getNodes() {
  */
 async function getResources(type, namespace = null) {
   try {
-    const { coreApi, appsApi, batchApi } = getK8sClient();
+    const { coreApi, appsApi, batchApi, storageApi } = getK8sClient();
     let response;
 
     switch (type.toLowerCase()) {
@@ -226,6 +227,91 @@ async function getResources(type, namespace = null) {
           lastSchedule: cj.status.lastScheduleTime,
           age: cj.metadata.creationTimestamp
         }));
+
+      // ---- storage -------------------------------------------------------
+      // Without these, a stuck PersistentVolumeClaim is undiagnosable: the
+      // agent can see the Pending pod but not the claim that is blocking it,
+      // which is the actual cause of KubePVCStuckPending.
+      case 'pvc':
+      case 'persistentvolumeclaims':
+        response = (namespace && namespace !== 'all')
+          ? await coreApi.listNamespacedPersistentVolumeClaim(namespace)
+          : await coreApi.listPersistentVolumeClaimForAllNamespaces();
+        return ((response.body || response).items || []).map(p => ({
+          name: p.metadata.name,
+          namespace: p.metadata.namespace,
+          status: p.status?.phase,
+          volumeName: p.spec?.volumeName || null,
+          storageClass: p.spec?.storageClassName || null,
+          accessModes: p.spec?.accessModes || [],
+          requested: p.spec?.resources?.requests?.storage || null,
+          capacity: p.status?.capacity?.storage || null,
+          age: p.metadata.creationTimestamp,
+        }));
+
+      case 'pv':
+      case 'persistentvolumes':
+        response = await coreApi.listPersistentVolume();
+        return ((response.body || response).items || []).map(p => ({
+          name: p.metadata.name,
+          status: p.status?.phase,
+          capacity: p.spec?.capacity?.storage || null,
+          accessModes: p.spec?.accessModes || [],
+          reclaimPolicy: p.spec?.persistentVolumeReclaimPolicy,
+          storageClass: p.spec?.storageClassName || null,
+          claim: p.spec?.claimRef ? `${p.spec.claimRef.namespace}/${p.spec.claimRef.name}` : null,
+          age: p.metadata.creationTimestamp,
+        }));
+
+      case 'sc':
+      case 'storageclasses':
+        response = await storageApi.listStorageClass();
+        return ((response.body || response).items || []).map(s => ({
+          name: s.metadata.name,
+          provisioner: s.provisioner,
+          reclaimPolicy: s.reclaimPolicy,
+          volumeBindingMode: s.volumeBindingMode,
+          isDefault: s.metadata.annotations?.['storageclass.kubernetes.io/is-default-class'] === 'true',
+          age: s.metadata.creationTimestamp,
+        }));
+
+      case 'nodes':
+        response = await coreApi.listNode();
+        return ((response.body || response).items || []).map(nd => ({
+          name: nd.metadata.name,
+          status: (nd.status?.conditions || []).find(c => c.type === 'Ready')?.status === 'True' ? 'Ready' : 'NotReady',
+          roles: Object.keys(nd.metadata.labels || {})
+            .filter(k => k.startsWith('node-role.kubernetes.io/'))
+            .map(k => k.split('/')[1]),
+          taints: (nd.spec?.taints || []).map(t => `${t.key}=${t.value || ''}:${t.effect}`),
+          cpu: nd.status?.allocatable?.cpu,
+          memory: nd.status?.allocatable?.memory,
+          age: nd.metadata.creationTimestamp,
+        }));
+
+      // ---- events --------------------------------------------------------
+      // The single most useful diagnostic in Kubernetes, and the agent had no
+      // way to read it. Warnings first: that is where the reason lives.
+      case 'events':
+        response = (namespace && namespace !== 'all')
+          ? await coreApi.listNamespacedEvent(namespace)
+          : await coreApi.listEventForAllNamespaces();
+        return ((response.body || response).items || [])
+          .map(e => ({
+            namespace: e.metadata.namespace,
+            type: e.type,
+            reason: e.reason,
+            message: e.message,
+            object: `${e.involvedObject?.kind}/${e.involvedObject?.name}`,
+            count: e.count || 1,
+            firstSeen: e.firstTimestamp || e.eventTime,
+            lastSeen: e.lastTimestamp || e.eventTime,
+          }))
+          .sort((a, b) => {
+            if ((a.type === 'Warning') !== (b.type === 'Warning')) return a.type === 'Warning' ? -1 : 1;
+            return new Date(b.lastSeen || 0) - new Date(a.lastSeen || 0);
+          })
+          .slice(0, 100);
 
       default:
         throw new Error(`Unsupported resource type: ${type}`);

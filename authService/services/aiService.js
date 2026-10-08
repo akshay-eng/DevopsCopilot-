@@ -112,24 +112,54 @@ Be specific and practical. No markdown, no prose outside the JSON.`;
  * General recommendation helper: given a titled context blob, return
  * prioritised, actionable suggestions.
  */
-async function recommend({ title, context, maxItems = 5 }) {
+async function recommend({ title, context, maxItems = 5, maxTokens = 3000, timeout }) {
   const sys = `You are an SRE assistant. Given operational context, return ONLY JSON:
 {"summary":"one sentence","recommendations":[{"title":"short","detail":"what to do and why","priority":"high|medium|low"}]}
 At most ${maxItems} recommendations, ordered by impact. Be concrete and specific to the data given.`;
   const raw = await chat([
     { role: 'system', content: sys },
     { role: 'user', content: `${title}\n\n${typeof context === 'string' ? context : JSON.stringify(context, null, 2).slice(0, 6000)}` },
-  ], { maxTokens: 3000 });
+  ], { maxTokens, ...(timeout ? { timeout } : {}) });
 
   const parsed = extractJson(raw);
   if (parsed?.recommendations?.length) return { ...parsed, source: 'ai' };
+
+  if (raw && String(raw).trim()) {
+    return {
+      summary: parsed?.summary
+        || 'The model replied but produced no usable recommendations — its token budget is likely exhausted by reasoning.',
+      recommendations: [],
+      source: 'unparsed',
+      rawLength: String(raw).length,
+    };
+  }
   return {
-    summary: 'AI model unavailable — showing no automated recommendations.',
+    // The model being slow and the model being down produce the same empty
+    // result here, and saying 'unavailable' for a timeout sends people to the
+    // wrong place. chat() logs which one it was.
+    summary: 'The analysis model did not answer in time — showing the findings without suggested actions.',
     recommendations: [],
     source: 'unavailable',
   };
 }
 
+/**
+ * Free-shape JSON helper: the caller states the schema it wants in `title` and
+ * gets the parsed object back, or null. Unlike recommend(), this imposes no
+ * shape of its own — for prose where "a summary and a list" is the wrong mould.
+ */
+async function summarise({ title, context, maxTokens = 3000, timeout }) {
+  const sys = 'You are an experienced SRE. Return ONLY a single JSON object, no prose '
+    + 'outside it and no code fences. Ground every statement in the data given; '
+    + 'never invent names, numbers or causes.';
+  const raw = await chat([
+    { role: 'system', content: sys },
+    { role: 'user', content: `${title}\n\n${typeof context === 'string' ? context : JSON.stringify(context, null, 2).slice(0, 8000)}` },
+  ], { maxTokens, ...(timeout ? { timeout } : {}) });
+
+  return extractJson(raw);
+}
+
 const available = () => Boolean(LLM_URL);
 
-module.exports = { chat, explainVulnerability, recommend, available, extractJson, LLM_MODEL, LLM_URL };
+module.exports = { chat, explainVulnerability, recommend, summarise, available, extractJson, LLM_MODEL, LLM_URL };

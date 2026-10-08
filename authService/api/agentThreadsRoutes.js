@@ -34,6 +34,38 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
+// GET /api/agent-threads/approvals — everything the agent is waiting on a human for
+// Declared before '/:id' so "approvals" is not swallowed as a thread id.
+router.get('/approvals', protect, async (req, res) => {
+  try {
+    const data = await agentFetch(`/api/approvals?userId=${encodeURIComponent(req.user._id.toString())}`);
+    res.json({ success: true, agentOnline: true, ...data });
+  } catch (e) {
+    res.json({ success: true, agentOnline: false, approvals: [], error: e.message });
+  }
+});
+
+// POST /api/agent-threads/approvals/:id { approved, reason }
+router.post('/approvals/:id', protect, async (req, res) => {
+  try {
+    const r = await fetch(`${AGENT_URL}/api/approvals/${encodeURIComponent(req.params.id)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        approved: Boolean(req.body?.approved),
+        by: req.user.email || req.user._id.toString(),
+        reason: req.body?.reason,
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) return res.status(r.status).json({ success: false, ...data });
+    res.json({ success: true, ...data });
+  } catch (e) {
+    res.status(503).json({ success: false, error: `Agent runtime unreachable: ${e.message}` });
+  }
+});
+
 // GET /api/agent-threads/:id — full detail for one thread
 router.get('/:id', protect, async (req, res) => {
   try {

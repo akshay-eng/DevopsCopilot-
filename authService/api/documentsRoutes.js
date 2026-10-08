@@ -16,6 +16,9 @@ const REPO_ROOT = process.env.DOCS_REPO_ROOT || path.join(__dirname, '..', '..')
 
 // Named, explicitly allow-listed roots. Nothing outside these is reachable.
 const ROOTS = [
+  // Runbooks the agent writes when it resolves an alert. Listed first because
+  // it is the folder that actually changes day to day.
+  { id: 'sops', name: 'SOPs & Runbooks', dir: process.env.SOP_DIR || path.join(REPO_ROOT, 'Docs', 'SOPs'), icon: 'book' },
   { id: 'docs', name: 'Docs', dir: path.join(REPO_ROOT, 'Docs'), icon: 'book' },
   { id: 'runbooks', name: 'Runbooks & Manifests', dir: path.join(REPO_ROOT, 'k8s-configs'), icon: 'server' },
   { id: 'charts', name: 'Helm Charts', dir: path.join(REPO_ROOT, 'helm'), icon: 'package' },

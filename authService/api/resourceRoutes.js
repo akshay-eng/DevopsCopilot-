@@ -188,7 +188,11 @@ router.get('/:id/resources/:type', protect, async (req, res) => {
     // Validate resource type
     const validTypes = [
       'pods', 'deployments', 'services', 'statefulsets',
-      'daemonsets', 'jobs', 'cronjobs'
+      'daemonsets', 'jobs', 'cronjobs',
+      // Storage and events: needed to diagnose scheduling and volume failures,
+      // which is most of what an unresolved alert actually turns out to be.
+      'pvc', 'persistentvolumeclaims', 'pv', 'persistentvolumes',
+      'sc', 'storageclasses', 'nodes', 'events'
     ];
 
     if (!validTypes.includes(type)) {

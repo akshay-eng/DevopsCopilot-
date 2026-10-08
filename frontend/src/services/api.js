@@ -395,6 +395,19 @@ export const getChartFootprint = async (nodeCount = 3, components) =>
     params: { nodeCount, ...(components ? { components: components.join(',') } : {}) },
   });
 
+/** Fleet-wide rollup: every cluster in one call. */
+export const getFleetOverview = async (hours = 24, refresh = false) =>
+  backendApi.get('/api/fleet/overview', { params: { hours, ...(refresh ? { refresh: 1 } : {}) } });
+
+/**
+ * AI summary + suggested actions for ONE dashboard panel.
+ * topic: cluster_health | node_health | reliability | security | utilisation | alerts
+ */
+export const getFleetAdvice = async (topic, hours = 24) =>
+  // The reasoning model can take minutes on the larger panels, so this call
+  // overrides the client default rather than giving up before the server does.
+  backendApi.get(`/api/fleet/advice/${topic}`, { params: { hours }, timeout: 320000 });
+
 /** Live footprint of the components we installed on a cluster. */
 export const getPlatformFootprint = async (clusterId) =>
   backendApi.get('/api/compliance/footprint', { params: clusterId ? { clusterId } : {} });

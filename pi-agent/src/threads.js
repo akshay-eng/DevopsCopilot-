@@ -14,7 +14,7 @@ const threads = new Map(); // id -> thread
 function prune() {
   if (threads.size <= MAX_THREADS) return;
   const finished = [...threads.values()]
-    .filter((t) => t.status !== 'running')
+    .filter((t) => t.status !== 'running' && t.status !== 'awaiting-approval')
     .sort((a, b) => new Date(a.endedAt || a.startedAt) - new Date(b.endedAt || b.startedAt));
   for (const t of finished.slice(0, threads.size - MAX_THREADS)) threads.delete(t.id);
 }
@@ -37,6 +37,9 @@ export function startThread({ prompt, userId, model, clusterId, conversationId, 
     toolCalls: [],
     steps: 0,
     outputChars: 0,
+    approvals: [],
+    pendingApproval: null,
+    actions: [],
     error: null,
   };
   threads.set(id, t);
@@ -87,6 +90,95 @@ function truncate(v, n = 200) {
   return s.length > n ? `${s.slice(0, n)}…` : s;
 }
 
+// ---------------------------------------------------------------------------
+// Human approval
+//
+// A mutating action pauses the run here and waits for a person. The pending
+// request is published on the thread so the Agent Threads page can show it and
+// answer it; the agent's own tool call simply awaits the promise.
+//
+// A request that nobody answers must not pin a run open forever, so each one
+// expires — and expiry is a REFUSAL, never a silent go-ahead.
+// ---------------------------------------------------------------------------
+
+const APPROVAL_TIMEOUT_MS = Number(process.env.AGENT_APPROVAL_TIMEOUT_MS || 900000);
+
+export function requestApproval(id, { action, summary: text, risk, reversible, params }) {
+  const t = threads.get(id);
+  if (!t) return Promise.resolve({ approved: false, reason: 'Thread is no longer active.' });
+
+  const approval = {
+    id: crypto.randomUUID(),
+    action,
+    summary: text,
+    risk: risk || 'medium',
+    reversible: reversible !== false,
+    params: params || {},
+    status: 'pending',
+    requestedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + APPROVAL_TIMEOUT_MS).toISOString(),
+  };
+
+  t.approvals = t.approvals || [];
+  t.approvals.push(approval);
+  t.pendingApproval = approval;
+  t.status = 'awaiting-approval';
+
+  return new Promise((resolve) => {
+    const settle = (decision) => {
+      if (approval.status !== 'pending') return;
+      Object.assign(approval, decision, { decidedAt: new Date().toISOString() });
+      if (t.pendingApproval?.id === approval.id) t.pendingApproval = null;
+      if (t.status === 'awaiting-approval') t.status = 'running';
+      clearTimeout(timer);
+      pending.delete(approval.id);
+      resolve({ approved: decision.status === 'approved', reason: decision.reason });
+    };
+
+    const timer = setTimeout(
+      () => settle({ status: 'expired', reason: `No response within ${Math.round(APPROVAL_TIMEOUT_MS / 60000)} minutes — treated as refused.` }),
+      APPROVAL_TIMEOUT_MS,
+    );
+    timer.unref?.();
+
+    pending.set(approval.id, { settle, threadId: id });
+  });
+}
+
+const pending = new Map(); // approvalId -> {settle, threadId}
+
+/** Answer a pending approval. Returns false if it is unknown or already decided. */
+export function decideApproval(approvalId, { approved, by, reason }) {
+  const entry = pending.get(approvalId);
+  if (!entry) return false;
+  entry.settle({
+    status: approved ? 'approved' : 'rejected',
+    decidedBy: by || 'operator',
+    reason: reason || (approved ? 'Approved by operator.' : 'Rejected by operator.'),
+  });
+  return true;
+}
+
+/** Every approval still waiting on a person, for the UI to surface. */
+export function listPendingApprovals({ userId } = {}) {
+  const out = [];
+  for (const t of threads.values()) {
+    if (userId && t.userId && t.userId !== userId) continue;
+    for (const a of t.approvals || []) {
+      if (a.status === 'pending') out.push({ ...a, threadId: t.id, threadTitle: t.title });
+    }
+  }
+  return out;
+}
+
+/** Record a remediation the agent carried out, for the resolution summary. */
+export function recordAction(id, entry) {
+  const t = threads.get(id);
+  if (!t) return;
+  t.actions = t.actions || [];
+  t.actions.push({ ...entry, at: new Date().toISOString() });
+}
+
 export function listThreads({ userId, status, limit = 50 } = {}) {
   let all = [...threads.values()];
   if (userId) all = all.filter((t) => !t.userId || t.userId === userId);
@@ -107,6 +199,9 @@ function summary(t) {
     startedAt: t.startedAt, endedAt: t.endedAt, durationMs: t.durationMs,
     steps: t.steps, outputChars: t.outputChars, currentTool: t.currentTool || null,
     toolCalls: t.toolCalls.map((c) => ({ tool: c.tool, status: c.status, durationMs: c.durationMs })),
+    pendingApproval: t.pendingApproval || null,
+    approvals: t.approvals || [],
+    actions: t.actions || [],
     error: t.error,
   };
 }

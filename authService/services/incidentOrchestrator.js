@@ -233,7 +233,46 @@ async function autoProcess(userId, { minAlerts = 2, onlyCritical = false } = {})
   return out;
 }
 
+/**
+ * Close the ServiceNow incident attached to a correlated incident.
+ *
+ * State 6 is "Resolved", not "Closed" — a human still reviews and closes it.
+ * ServiceNow rejects a resolve without a close code and notes, which is why
+ * both are always sent.
+ *
+ * Returns {ok} / {ok:false, error} rather than throwing: failing to update the
+ * ticket must not undo a remediation that already succeeded on the cluster.
+ */
+async function resolveSnowIncident(userId, incidentDoc, { notes, closeCode = 'Solved (Permanently)' } = {}) {
+  const sysId = incidentDoc?.snowIncident?.sysId;
+  if (!sysId) return { ok: false, error: 'No ServiceNow incident is linked to this alert.' };
+
+  try {
+    const cfg = await snowConfig(userId);
+    await connectors.run('snow', 'update_ticket', cfg, {
+      table: 'incident',
+      sys_id: sysId,
+      fields: {
+        state: '6',
+        close_code: closeCode,
+        close_notes: (notes || 'Resolved by the AIOps agent.').slice(0, 4000),
+      },
+    });
+
+    incidentDoc.snowIncident.state = 'resolved';
+    incidentDoc.snowIncident.updatedAt = new Date();
+    if (typeof incidentDoc.save === 'function') await incidentDoc.save();
+
+    console.log(`[Orchestrator] ServiceNow ${incidentDoc.snowIncident.number} resolved`);
+    return { ok: true, number: incidentDoc.snowIncident.number };
+  } catch (e) {
+    console.warn('[Orchestrator] ServiceNow resolve failed:', e.message);
+    return { ok: false, error: e.message };
+  }
+}
+
 module.exports = {
   assessRemediation, buildDescription,
   createIncidentForCorrelation, raiseChangeRequest, processCorrelation, autoProcess,
+  resolveSnowIncident,
 };

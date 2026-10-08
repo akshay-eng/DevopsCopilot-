@@ -243,8 +243,16 @@ def _analyze_cluster(cluster, service_map):
     return {
         "cluster_id": cluster["cluster_id"],
         "alert_count": cluster["alert_count"],
+        # Distinct ongoing conditions vs total notifications received. One
+        # condition re-sent 40 times is one problem, and the description needs
+        # to say both rather than claiming 40 alerts.
+        "condition_count": cluster.get("condition_count", cluster["alert_count"]),
+        "occurrence_count": cluster.get("occurrence_count", cluster["alert_count"]),
         "time_range": cluster["time_range"],
         "pods": cluster["pods"],
+        "nodes": cluster.get("nodes", []),
+        "workloads": cluster.get("workloads", []),
+        "families": cluster.get("families", []),
         "namespaces": cluster["namespaces"],
         "alert_names": cluster["alert_names"],
         "severities": cluster["severities"],

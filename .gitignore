@@ -64,3 +64,7 @@ Thumbs.db
 helm/**/charts/
 helm/**/Chart.lock
 *.tgz
+
+# Pi agent runtime conversation state — not source
+.conversations/
+pi-agent/.conversations/

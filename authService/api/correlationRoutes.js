@@ -4,6 +4,7 @@ const { protect } = require('../middleware/auth');
 const axios = require('axios');
 const CorrelatedIncident = require('../models/CorrelatedIncident');
 const Integration = require('../models/Integration');
+const { ensureNarrative } = require('../services/incidentNarrativeService');
 
 const router = express.Router();
 
@@ -67,7 +68,9 @@ async function createSnowIncident(userId, incident) {
     const topSeverity = Object.keys(incident.severities || {}).reduce((best, s) =>
       (sevMap[s] || 5) < (sevMap[best] || 5) ? s : best, 'info');
 
-    const description = [
+    // Prefer the written narrative — the structured dump below is already
+    // appended to it — and fall back to the dump only if none was produced.
+    const description = incident.description || [
       `Root Cause: ${incident.rootCause?.pod || 'Unknown'} (ns/${incident.rootCause?.namespace || 'unknown'})`,
       `Score: ${incident.rootCause?.score?.toFixed(3) || 'N/A'}`,
       `Alerts: ${incident.alertCount} across ${incident.pods?.length || 0} pods`,
@@ -89,7 +92,8 @@ async function createSnowIncident(userId, incident) {
     ].join('\n');
 
     const body = {
-      short_description: `[Correlated] ${incident.rootCause?.pod || 'Unknown'}: ${(incident.alertNames || []).slice(0, 3).join(', ')}`,
+      short_description: (incident.title
+        || `[Correlated] ${incident.rootCause?.pod || 'Unknown'}: ${(incident.alertNames || []).slice(0, 3).join(', ')}`).slice(0, 160),
       description,
       urgency: sevMap[topSeverity] || 3,
       impact: sevMap[topSeverity] || 3,
@@ -130,7 +134,28 @@ async function createSnowIncident(userId, incident) {
 async function storeCorrelationResults(userId, correlationData, clusterId, cronJobId) {
   const results = [];
 
-  for (const cluster of (correlationData.clusters || [])) {
+  // A group of one is not a correlation.
+  //
+  // Correlation exists to say "these N separate alerts are one problem". When a
+  // cluster holds a single condition there is nothing to correlate, and raising
+  // a "[Correlated] ..." incident for it both misrepresents the finding and
+  // floods ServiceNow with one ticket per stray alert. Those alerts are still
+  // reported — through the normal alert path — they just do not get dressed up
+  // as a correlation here.
+  const MIN_CONDITIONS = Number(process.env.CORRELATION_MIN_CONDITIONS || 2);
+  const groups = (correlationData.clusters || []).filter((c) => {
+    const conditions = c.condition_count ?? c.alert_count ?? 0;
+    const distinctAlertNames = (c.alert_names || []).length;
+    // Either several distinct conditions, or one condition that is clearly
+    // recurring across multiple pods — both are genuinely "more than one thing".
+    const correlated = conditions >= MIN_CONDITIONS || distinctAlertNames >= MIN_CONDITIONS;
+    if (!correlated) {
+      console.log(`[CORRELATION] skipping single-condition group (${(c.alert_names || []).join(',')}) — nothing to correlate`);
+    }
+    return correlated;
+  });
+
+  for (const cluster of groups) {
     const fingerprint = buildFingerprint(cluster);
     const rca = cluster.root_cause_analysis || {};
 
@@ -144,6 +169,11 @@ async function storeCorrelationResults(userId, correlationData, clusterId, cronJ
       existing.occurrences += 1;
       existing.lastSeenAt = new Date();
       existing.alertCount = cluster.alert_count || existing.alertCount;
+      existing.conditionCount = cluster.condition_count || existing.conditionCount;
+      existing.occurrenceCount = cluster.occurrence_count || existing.occurrenceCount;
+      if (cluster.nodes?.length) existing.nodes = cluster.nodes;
+      if (cluster.workloads?.length) existing.workloads = cluster.workloads;
+      if (cluster.families?.length) existing.families = cluster.families;
       existing.statuses = cluster.statuses || existing.statuses;
       existing.timeRange = {
         start: cluster.time_range?.start,
@@ -155,6 +185,14 @@ async function storeCorrelationResults(userId, correlationData, clusterId, cronJ
       if (rca.topology) existing.topology = rca.topology;
       if (rca.evidence) existing.evidence = rca.evidence;
       if (cronJobId) existing.cronJobId = cronJobId;
+
+      // An incident stored before narratives existed still has none; fill it in
+      // once rather than leaving older incidents permanently undescribed.
+      try {
+        await ensureNarrative(existing);
+      } catch (e) {
+        console.warn('[CORRELATION] narrative backfill failed:', e.message);
+      }
 
       // Auto-create SNOW incident if not already created
       if (!existing.snowIncident?.number) {
@@ -184,8 +222,13 @@ async function storeCorrelationResults(userId, correlationData, clusterId, cronJ
           anomalousMetrics: rca.root_cause?.anomalous_metrics || [],
         },
         alertCount: cluster.alert_count,
+        conditionCount: cluster.condition_count || cluster.alert_count,
+        occurrenceCount: cluster.occurrence_count || cluster.alert_count,
         alertNames: cluster.alert_names || [],
         pods: cluster.pods || [],
+        nodes: cluster.nodes || [],
+        workloads: cluster.workloads || [],
+        families: cluster.families || [],
         namespaces: cluster.namespaces || [],
         severities: cluster.severities || {},
         statuses: cluster.statuses || {},
@@ -202,6 +245,14 @@ async function storeCorrelationResults(userId, correlationData, clusterId, cronJ
         executionTimeMs: correlationData.execution_time_ms,
         cronJobId: cronJobId || null,
       });
+
+      // Write the narrative BEFORE the ticket, so ServiceNow receives the
+      // readable description rather than a field dump.
+      try {
+        await ensureNarrative(doc);
+      } catch (e) {
+        console.warn('[CORRELATION] narrative failed:', e.message);
+      }
 
       await doc.save();
 

@@ -3,13 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import {
   backendApi, generateNlpWidget, getCustomWidgets, saveCustomWidget, deleteCustomWidget,
-  getClusters, getNodes, getResources, getClusterHistory,
+  getClusters, getNodes, getResources, getClusterHistory, getFleetOverview,
 } from '../services/api';
 import {
   RefreshCw, Sparkles, Wand2, Plus, Trash2, Loader2, X, ChevronRight, ArrowLeft,
   Flag, AlertTriangle, Layers, Boxes, Server, Download, Calendar,
 } from 'lucide-react';
 import TrendsWidget from './TrendsWidget';
+import FleetDashboard from './FleetDashboard';
+import ExecutiveDashboard from './ExecutiveDashboard';
 import TrendDetail from './TrendDetail';
 import {
   PALETTE, GradientLine, Violin, densityOf, Composition, StackedMicroBars,
@@ -67,17 +69,65 @@ const pctOf = (current, delta) => {
   return Math.round((delta / prev) * 100);
 };
 
+/**
+ * Last-seen fleet payload, per time range. A dashboard that already showed you
+ * these numbers a minute ago should not go blank while it re-reads the estate.
+ */
+const FLEET_SNAP_KEY = 'aiops-fleet-snapshot';
+const FLEET_SNAP_MAX_AGE_MS = 15 * 60 * 1000;
+const readFleetSnapshot = (hours) => {
+  try {
+    const all = JSON.parse(localStorage.getItem(FLEET_SNAP_KEY) || '{}');
+    const hit = all[String(hours)];
+    if (!hit || Date.now() - hit.at > FLEET_SNAP_MAX_AGE_MS) return null;
+    return hit.value;
+  } catch { return null; }
+};
+const writeFleetSnapshot = (hours, value) => {
+  try {
+    const all = JSON.parse(localStorage.getItem(FLEET_SNAP_KEY) || '{}');
+    all[String(hours)] = { at: Date.now(), value };
+    localStorage.setItem(FLEET_SNAP_KEY, JSON.stringify(all));
+  } catch { /* quota or private mode — the dashboard still works, just colder */ }
+};
+
 const Trends = () => {
   const { theme } = useTheme();
   const dk = theme === 'dark';
   const navigate = useNavigate();
 
-  const [tab, setTab] = useState('alerts');
+  const [tab, setTab] = useState('fleet');
   const [detail, setDetail] = useState(null);
   const [range, setRange] = useState('30D');
   const [clusters, setClusters] = useState([]);
   const [clusterId, setClusterId] = useState('');
   const hours = useMemo(() => RANGES.find((r) => r[0] === range)?.[1] || 720, [range]);
+
+  // ── fleet (every cluster, one call) ──────────────────────────────────
+  // Replaces the per-cluster dropdown: the dashboard describes the whole
+  // estate, and each row carries its cluster so views can group by it.
+  // The rollup reads every cluster, so a cold call takes seconds. Keep the last
+  // payload in the browser and paint it immediately on arrival, then refresh
+  // behind what is already on screen — nobody should watch a spinner to see
+  // numbers we already had.
+  const [fleet, setFleet] = useState(() => readFleetSnapshot(hours));
+  const [fleetLoading, setFleetLoading] = useState(() => !readFleetSnapshot(hours));
+  const [fleetStale, setFleetStale] = useState(false);
+  const [fleetError, setFleetError] = useState(null);
+  const fetchFleet = useCallback(async (refresh = false) => {
+    const cached = readFleetSnapshot(hours);
+    if (cached) { setFleet(cached); setFleetLoading(false); setFleetStale(true); }
+    else { setFleetLoading(true); }
+    setFleetError(null);
+    try {
+      const r = await getFleetOverview(hours, refresh);
+      if (r?.success) { setFleet(r); writeFleetSnapshot(hours, r); }
+      else if (!cached) setFleetError(r?.error || 'Could not load the fleet.');
+    } catch (e) {
+      if (!cached) setFleetError(e.message || 'Could not load the fleet.');
+    } finally { setFleetLoading(false); setFleetStale(false); }
+  }, [hours]);
+  useEffect(() => { fetchFleet(); }, [fetchFleet]);
 
   const page = dk ? 'bg-[#0b0b0b]' : 'bg-white';
   const h1 = dk ? 'text-gray-50' : 'text-gray-900';
@@ -457,14 +507,16 @@ const Trends = () => {
         <div className="flex items-start justify-between gap-6 flex-wrap mb-7">
           <div>
             <h1 className={`text-[26px] font-semibold tracking-tight ${h1}`}>Operations Intelligence</h1>
-            <p className={`text-[13px] mt-1 ${muted}`}>AI-detected signals across alerts, workloads and vulnerabilities</p>
+            <p className={`text-[13px] mt-1 ${muted}`}>
+              Every connected cluster, in one view
+              {fleet?.clusters && (
+                <span className={`ml-2 px-1.5 py-0.5 rounded text-[10.5px] align-middle ${dk ? 'bg-[#1e1e1e] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+                  {fleet.clusters.reachable} of {fleet.clusters.total} cluster{fleet.clusters.total === 1 ? '' : 's'}
+                </span>
+              )}
+            </p>
           </div>
           <div className="flex items-center gap-2">
-            <select value={clusterId} onChange={(e) => { setClusterId(e.target.value); setDrill(null); }}
-              className={`px-3 py-2 rounded-lg text-[12.5px] border outline-none ${dk ? 'bg-[#131313] border-[#232323] text-gray-300' : 'bg-white border-gray-200 text-gray-700'}`}>
-              {clusters.length === 0 && <option value="">No clusters</option>}
-              {clusters.map((c) => <option key={c._id || c.id} value={c._id || c.id}>{c.name || c._id}</option>)}
-            </select>
             <div className={`inline-flex items-center gap-1 px-2.5 py-2 rounded-lg border ${dk ? 'bg-[#131313] border-[#232323]' : 'bg-white border-gray-200'}`}>
               <Calendar size={13} className={faint} />
               {RANGES.map(([l]) => (
@@ -472,9 +524,9 @@ const Trends = () => {
                   className={`px-2 py-0.5 rounded text-[12px] font-medium ${range === l ? (dk ? 'bg-[#232323] text-gray-100' : 'bg-gray-100 text-gray-900') : muted}`}>{l}</button>
               ))}
             </div>
-            <button onClick={() => (tab === 'alerts' ? fetchAlerts() : fetchK8s())}
+            <button onClick={() => { fetchFleet(true); fetchAlerts(); }}
               className={`p-2 rounded-lg border ${dk ? 'bg-[#131313] border-[#232323] text-gray-400' : 'bg-white border-gray-200 text-gray-500'}`}>
-              <RefreshCw size={14} className={(tab === 'alerts' ? loadingAlerts : k8s.loading) ? 'animate-spin' : ''} />
+              <RefreshCw size={14} className={(fleetLoading || fleetStale || loadingAlerts) ? 'animate-spin' : ''} />
             </button>
             <button onClick={() => navigate('/dashboard/report')}
               className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[12.5px] font-medium ${dk ? 'bg-gray-100 text-gray-900' : 'bg-gray-900 text-white'}`}>
@@ -557,7 +609,7 @@ const Trends = () => {
 
         {/* Tabs */}
         <div className={`flex items-center gap-1 border-b mt-7 ${borderC}`}>
-          {[['alerts', 'Alerts & Incidents'], ['kubernetes', 'Kubernetes']].map(([id, label]) => (
+          {[['fleet', 'Fleet Operations'], ['executive', 'Executive']].map(([id, label]) => (
             <button key={id} onClick={() => { setTab(id); setDrill(null); }}
               className={`px-4 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors ${tab === id
                 ? (dk ? 'border-gray-100 text-gray-100' : 'border-gray-900 text-gray-900')
@@ -565,660 +617,45 @@ const Trends = () => {
           ))}
         </div>
 
-        {/* ── ALERTS TILE GRID ── */}
-        {tab === 'alerts' && (
-          <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 divide-x divide-y ${divide} border-b ${borderC}`}>
-            <MetricTile dk={dk} value={num(summary.firing)} caption="Alerts firing now"
-              axisLeft={axisFrom} axisRight={axisTo}
-              onClick={() => setDetail({
-                title: 'Alerts firing over time', subtitle: `Critical + warning per bucket · last ${range}`,
-                kind: 'area', data: timeline, series: ['Critical', 'Warning'], xKey: 'label',
-                stats: [
-                  { label: 'Firing now', value: num(summary.firing), tone: STATUS.bad },
-                  { label: 'Peak bucket', value: num(peak?.count) },
-                  { label: 'Avg per bucket', value: num(avgPerBucket) },
-                  { label: 'Buckets', value: num(timeline.length) },
-                ],
-                table: { title: 'Per bucket', columns: ['Bucket', 'Critical', 'Warning', 'Info', 'Total'],
-                  rows: timeline.map((t) => [t.label, t.Critical, t.Warning, t.Info, t.Total]) },
-              })}>
-              <GradientLine data={series.firing.map((v) => ({ v }))} color={PALETTE.indigo} dk={dk} />
-            </MetricTile>
-
-            <MetricTile dk={dk} value={`${resolutionRate}%`} caption="Alert resolution rate"
-              axisLeft={`${num(summary.total)} alerts in window`} axisRight=""
-              onClick={() => setDetail({
-                title: 'Resolution rate', subtitle: 'How much of the window’s alert volume has been closed out',
-                kind: 'bar', data: [
-                  { name: 'Resolved', value: summary.resolved || 0 },
-                  { name: 'Firing', value: summary.firing || 0 },
-                ], xKey: 'name',
-                stats: [
-                  { label: 'Resolved', value: num(summary.resolved), tone: STATUS.ok },
-                  { label: 'Still firing', value: num(summary.firing), tone: STATUS.bad },
-                  { label: 'Resolution rate', value: `${resolutionRate}%` },
-                  { label: 'Total', value: num(summary.total) },
-                ],
-                table: { title: 'Most frequent unresolved signatures', columns: ['Alert', 'Severity', 'Namespace', 'Count'],
-                  rows: topAlertsFull.filter((a) => a.status === 'firing').map((a) => [a.alertname, a.severity, a.namespace || '—', a.count]) },
-              })}>
-              <Composition dk={dk} segments={[
-                { label: 'Resolved', value: summary.resolved || 0, color: STATUS.ok },
-                { label: 'Still firing', value: summary.firing || 0, color: STATUS.bad },
-              ]} />
-            </MetricTile>
-
-            <MetricTile dk={dk} value={num(summary.criticalCount)} caption="Critical severity alerts"
-              delta={pctOf(summary.criticalCount, delta.critical) != null ? `${Math.abs(pctOf(summary.criticalCount, delta.critical))}%` : null}
-              deltaDir={(delta.critical || 0) <= 0 ? 'down' : 'up'}
-              axisLeft={<Legend items={[['Critical', STATUS.bad], ['Warning', STATUS.warn], ['Info', STATUS.idle]]} dk={dk} />}
-              axisRight={axisTo}
-              onClick={() => setDetail({
-                title: 'Severity mix over time', subtitle: `Every alert bucketed by severity · last ${range}`,
-                kind: 'stackedBar', data: timeline, series: ['Critical', 'Warning', 'Info'], xKey: 'label',
-                stats: [
-                  { label: 'Critical', value: num(summary.criticalCount), tone: STATUS.bad },
-                  { label: 'Warning', value: num(summary.warningCount), tone: STATUS.warn },
-                  { label: 'Info', value: num(summary.infoCount), tone: STATUS.idle },
-                  { label: 'Critical share', value: `${summary.total ? Math.round((summary.criticalCount / summary.total) * 100) : 0}%` },
-                ],
-                table: { title: 'Per bucket', columns: ['Bucket', 'Critical', 'Warning', 'Info'],
-                  rows: timeline.map((t) => [t.label, t.Critical, t.Warning, t.Info]) },
-              })}>
-              <StackedMicroBars data={series.stacks} colors={[STATUS.bad, STATUS.warn, STATUS.idle]} dk={dk} />
-            </MetricTile>
-
-            <MetricTile dk={dk} value={num(summary.total)} caption="Total alert volume"
-              delta={pctOf(summary.total, delta.total) != null ? `${Math.abs(pctOf(summary.total, delta.total))}%` : null}
-              deltaDir={(delta.total || 0) <= 0 ? 'down' : 'up'}
-              axisLeft={axisFrom} axisRight={axisTo}
-              onClick={() => setDetail({
-                title: 'Total alert volume', subtitle: `All severities per bucket · last ${range}`,
-                kind: 'bar', data: timeline, series: ['Total'], xKey: 'label',
-                stats: [
-                  { label: 'Total', value: num(summary.total) },
-                  { label: 'vs previous', value: `${(delta.total || 0) > 0 ? '+' : ''}${num(delta.total)}` },
-                  { label: 'Peak bucket', value: num(peak?.count) },
-                  { label: 'Avg per bucket', value: num(avgPerBucket) },
-                ],
-                table: { title: 'Per bucket', columns: ['Bucket', 'Total'], rows: timeline.map((t) => [t.label, t.Total]) },
-              })}>
-              <VBars data={series.total} color={PALETTE.violet} dk={dk} />
-            </MetricTile>
-
-            <MetricTile dk={dk} value={num(nsAll.length)} caption="Namespaces affected"
-              axisLeft="0" axisRight={String(Math.max(...nsAll.map((i) => i.value), 0) || 0)}
-              onClick={() => setDetail({
-                title: 'Alerts by namespace', subtitle: 'Where the noise is coming from, split by severity',
-                kind: 'hbar', data: nsAll.slice(0, 12), series: ['Critical', 'Warning', 'Info'], xKey: 'name',
-                stats: [
-                  { label: 'Namespaces', value: num(nsAll.length) },
-                  { label: 'Noisiest', value: nsAll[0]?.name || '—' },
-                  { label: 'Its share', value: `${summary.total && nsAll[0] ? Math.round((nsAll[0].value / summary.total) * 100) : 0}%` },
-                  { label: 'Total', value: num(summary.total) },
-                ],
-                table: { title: 'All namespaces', columns: ['Namespace', 'Critical', 'Warning', 'Info', 'Total'],
-                  rows: nsAll.map((n) => [n.name, n.Critical, n.Warning, n.Info, n.value]) },
-              })}>
-              <HBars items={nsItems} color={PALETTE.blue} dk={dk} />
-            </MetricTile>
-
-            <MetricTile dk={dk} value={num(topAlertsFull.length)} caption="Distinct alert signatures"
-              axisLeft={topAlertsFull[0] ? `top: ${topAlertsFull[0].alertname}`.slice(0, 34) : ''} axisRight=""
-              onClick={() => setDetail({
-                title: 'Alert signatures', subtitle: 'Distinct alertnames ranked by how often they fired',
-                kind: 'treemap', data: topAlertItems, xKey: 'name',
-                stats: [
-                  { label: 'Signatures', value: num(topAlertsFull.length) },
-                  { label: 'Most frequent', value: num(topAlertsFull[0]?.count) },
-                  { label: 'Still firing', value: num(topAlertsFull.filter((a) => a.status === 'firing').length) },
-                  { label: 'Total', value: num(summary.total) },
-                ],
-                table: { title: 'Signatures', columns: ['Alert', 'Severity', 'Namespace', 'Status', 'Count'],
-                  rows: topAlertsFull.map((a) => [a.alertname, a.severity, a.namespace || '—', a.status, a.count]) },
-              })}>
-              <TreemapTile data={topAlertItems} dk={dk} />
-            </MetricTile>
-
-            <MetricTile dk={dk} value={num(summary.warningCount)} caption="Warning severity alerts"
-              delta={pctOf(summary.warningCount, delta.warning) != null ? `${Math.abs(pctOf(summary.warningCount, delta.warning))}%` : null}
-              deltaDir={(delta.warning || 0) <= 0 ? 'down' : 'up'}
-              axisLeft={axisFrom} axisRight={axisTo}
-              onClick={() => setDetail({
-                title: 'Warning alerts over time', subtitle: `Warning + medium severity · last ${range}`,
-                kind: 'area', data: timeline, series: ['Warning'], xKey: 'label',
-                stats: [
-                  { label: 'Warning', value: num(summary.warningCount), tone: STATUS.warn },
-                  { label: 'vs previous', value: `${(delta.warning || 0) > 0 ? '+' : ''}${num(delta.warning)}` },
-                  { label: 'Share of total', value: `${summary.total ? Math.round((summary.warningCount / summary.total) * 100) : 0}%` },
-                  { label: 'Buckets', value: num(timeline.length) },
-                ],
-                table: { title: 'Per bucket', columns: ['Bucket', 'Warning'], rows: timeline.map((t) => [t.label, t.Warning]) },
-              })}>
-              <GradientLine data={series.warning.map((v) => ({ v }))} color={STATUS.warn} dk={dk} />
-            </MetricTile>
-
-            <MetricTile dk={dk} value={num(summary.infoCount)} caption="Informational alerts"
-              axisLeft={axisFrom} axisRight={axisTo}
-              onClick={() => setDetail({
-                title: 'Informational alerts over time', subtitle: `Info + low severity · last ${range}`,
-                kind: 'area', data: timeline, series: ['Info'], xKey: 'label',
-                stats: [
-                  { label: 'Info', value: num(summary.infoCount), tone: STATUS.idle },
-                  { label: 'Share of total', value: `${summary.total ? Math.round((summary.infoCount / summary.total) * 100) : 0}%` },
-                  { label: 'Avg per bucket', value: num(timeline.length ? Math.round(summary.infoCount / timeline.length) : 0) },
-                  { label: 'Buckets', value: num(timeline.length) },
-                ],
-                table: { title: 'Per bucket', columns: ['Bucket', 'Info'], rows: timeline.map((t) => [t.label, t.Info]) },
-              })}>
-              <GradientLine data={series.info.map((v) => ({ v }))} color={STATUS.idle} dk={dk} />
-            </MetricTile>
-
-            <MetricTile dk={dk} value={num(clusterAll.length)} caption="Clusters reporting"
-              axisLeft={<Legend items={[['Critical', STATUS.bad], ['Warning', STATUS.warn], ['Info', STATUS.idle]]} dk={dk} />} axisRight=""
-              onClick={() => setDetail({
-                title: 'Alerts by cluster', subtitle: 'Severity mix per connected cluster',
-                kind: 'hbar', data: clusterAll, series: ['Critical', 'Warning', 'Info'], xKey: 'name',
-                stats: [
-                  { label: 'Clusters', value: num(clusterAll.length) },
-                  { label: 'Noisiest', value: clusterAll[0]?.name || '—' },
-                  { label: 'Its alerts', value: num(clusterAll[0]?.value) },
-                  { label: 'Total', value: num(summary.total) },
-                ],
-                table: { title: 'Clusters', columns: ['Cluster', 'Critical', 'Warning', 'Info', 'Total'],
-                  rows: clusterAll.map((c) => [c.name, c.Critical, c.Warning, c.Info, c.value]) },
-              })}>
-              <StackedMicroBars
-                data={clusterAll.slice(0, 8).map((c) => [c.Critical, c.Warning, c.Info])}
-                labels={clusterAll.slice(0, 8).map((c) => c.name)}
-                colors={[STATUS.bad, STATUS.warn, STATUS.idle]} dk={dk} />
-            </MetricTile>
-
-            <MetricTile dk={dk} value={num(podAll.length)} caption="Pods raising alerts"
-              axisLeft={podAll[0] ? `worst: ${podAll[0].value}` : ''} axisRight=""
-              onClick={() => setDetail({
-                title: 'Alerts by pod', subtitle: 'The workloads generating the most alert traffic',
-                kind: 'hbar', data: podAll.map((p) => ({ name: p.name.slice(0, 32), value: p.value })), xKey: 'name',
-                stats: [
-                  { label: 'Pods alerting', value: num(podAll.length) },
-                  { label: 'Worst pod', value: num(podAll[0]?.value) },
-                  { label: 'Its namespace', value: podAll[0]?.namespace || '—' },
-                  { label: 'Total', value: num(podAll.reduce((s, p) => s + p.value, 0)) },
-                ],
-                table: { title: 'Pods', columns: ['Pod', 'Namespace', 'Severity', 'Alerts'],
-                  rows: podAll.map((p) => [p.name, p.namespace || '—', p.severity || '—', p.value]) },
-              })}>
-              <HBars items={podAll.slice(0, 6)} color={PALETTE.teal} dk={dk} />
-            </MetricTile>
-
-            <MetricTile dk={dk} value={num(peak?.count)} caption="Peak alerts in one bucket"
-              axisLeft={peak?.when ? fmtBucket(peak.when) : ''} axisRight={`avg ${num(avgPerBucket)}`}
-              onClick={() => setDetail({
-                title: 'Alert bursts', subtitle: 'Volume per bucket — spikes mark incident windows',
-                kind: 'bar', data: timeline, series: ['Total'], xKey: 'label',
-                stats: [
-                  { label: 'Peak', value: num(peak?.count), tone: STATUS.bad },
-                  { label: 'Peak at', value: peak?.when ? fmtBucket(peak.when) : '—' },
-                  { label: 'Average', value: num(avgPerBucket) },
-                  { label: 'Peak vs avg', value: avgPerBucket ? `${Math.round((peak?.count || 0) / avgPerBucket)}×` : '—' },
-                ],
-                table: { title: 'Busiest buckets', columns: ['Bucket', 'Total', 'Critical'],
-                  rows: [...timeline].sort((a, b) => b.Total - a.Total).map((t) => [t.label, t.Total, t.Critical]) },
-              })}>
-              <Violin density={densityOf(series.total)} color={PALETTE.orange} dk={dk} />
-            </MetricTile>
-
-            <MetricTile dk={dk} value={vulnSummary ? num(vulnSummary.totals?.total) : '—'} caption="Vulnerability findings"
-              axisLeft={vulnSummary ? <Legend items={[['Critical', STATUS.bad], ['High', '#e06a30'], ['Medium', '#d9a441'], ['Low', '#94a3b8']]} dk={dk} /> : 'Trivy not reporting'}
-              axisRight=""
-              onClick={vulnSummary ? () => setDetail({
-                title: 'Vulnerabilities by severity', subtitle: `Trivy findings across ${num(vulnSummary.scannedWorkloads)} scanned workloads`,
-                kind: 'bar', data: [
-                  { name: 'Critical', value: vulnSummary.totals?.critical || 0 },
-                  { name: 'High', value: vulnSummary.totals?.high || 0 },
-                  { name: 'Medium', value: vulnSummary.totals?.medium || 0 },
-                  { name: 'Low', value: vulnSummary.totals?.low || 0 },
-                ], xKey: 'name',
-                stats: [
-                  { label: 'Critical', value: num(vulnSummary.totals?.critical), tone: STATUS.bad },
-                  { label: 'High', value: num(vulnSummary.totals?.high), tone: '#e06a30' },
-                  { label: 'Total', value: num(vulnSummary.totals?.total) },
-                  { label: 'Workloads', value: num(vulnSummary.scannedWorkloads) },
-                ],
-                table: { title: 'Most vulnerable images', columns: ['Image', 'Findings'],
-                  rows: (vulnSummary.topImages || []).map((im) => [im.image, im.total]) },
-              }) : undefined}>
-              {vulnSummary ? (
-                <Composition dk={dk} segments={[
-                  { label: 'Critical', value: vulnSummary.totals?.critical || 0, color: STATUS.bad },
-                  { label: 'High', value: vulnSummary.totals?.high || 0, color: '#e06a30' },
-                  { label: 'Medium', value: vulnSummary.totals?.medium || 0, color: '#d9a441' },
-                  { label: 'Low', value: vulnSummary.totals?.low || 0, color: '#94a3b8' },
-                ]} />
-              ) : (
-                <div className={`flex items-center justify-center text-[11.5px] ${faint}`} style={{ height: 96 }}>Trivy Operator not detected</div>
-              )}
-            </MetricTile>
+        {/* ── FLEET OPERATIONS ── */}
+        {tab === 'fleet' && (
+          <div className="mt-6">
+            {fleetError ? (
+              <div className={`${card} px-6 py-10 text-center`}>
+                <p className={`text-[13px] ${muted}`}>{fleetError}</p>
+                <button onClick={() => fetchFleet(true)}
+                  className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-medium text-white"
+                  style={{ background: PALETTE.indigo }}>
+                  <RefreshCw size={13} /> Try again
+                </button>
+              </div>
+            ) : fleetLoading && !fleet ? (
+              <div className="py-20 flex items-center justify-center gap-2">
+                <Loader2 size={16} className="animate-spin" style={{ color: PALETTE.indigo }} />
+                <span className={`text-[13px] ${muted}`}>Reading every cluster…</span>
+              </div>
+            ) : (
+              <FleetDashboard fleet={fleet} dk={dk} hours={hours} />
+            )}
           </div>
         )}
 
-        {/* ── KUBERNETES TILE GRID ── */}
-        {tab === 'kubernetes' && (
-          <>
-            {!clusterId ? (
-              <div className="py-16 text-center"><p className={`text-[13px] ${muted}`}>Select a cluster to view fleet health.</p></div>
-            ) : k8s.loading ? (
-              <div className="py-16 flex items-center justify-center gap-2">
-                <Loader2 size={15} className="animate-spin" style={{ color: PALETTE.indigo }} />
-                <span className={`text-[13px] ${muted}`}>Reading cluster state…</span>
+        {/* ── EXECUTIVE ── */}
+        {tab === 'executive' && (
+          <div className="mt-6">
+            {fleetLoading && !fleet ? (
+              <div className="py-20 flex items-center justify-center gap-2">
+                <Loader2 size={16} className="animate-spin" style={{ color: PALETTE.indigo }} />
+                <span className={`text-[13px] ${muted}`}>Reading every cluster…</span>
               </div>
             ) : (
-              <>
-                {/* The tiles below are a point-in-time snapshot; only the CPU and memory
-                    tiles have a time axis, and only as far back as Prometheus retains. */}
-                {history && (history.truncated || !history.available) && (
-                  <div className={`flex items-start gap-2 px-5 py-2.5 text-[11.5px] border-b ${borderC} ${faint}`}>
-                    <AlertTriangle size={13} className="shrink-0 mt-[1px] text-amber-500" />
-                    <span>
-                      {history.available
-                        ? `Showing ${history.effectiveHours}h of history — Prometheus on this cluster retains ${history.retentionHours}h, so the ${range} range cannot be covered. Raise --storage.tsdb.retention.time to see further back. Counts below are current state.`
-                        : `${history.reason || 'History unavailable.'} CPU and memory show capacity only; counts below are current state.`}
-                    </span>
-                  </div>
-                )}
-                <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 divide-x divide-y ${divide} border-b ${borderC}`}>
-                  <MetricTile dk={dk} value={`${kpi.nodesReady}/${kpi.nodesTotal}`} caption="Nodes ready"
-                    axisLeft="pods scheduled per node" axisRight={String(Math.max(...nodeLoad.map((n) => n.value), 0))}
-                    onClick={() => setDetail({
-                      title: 'Node fleet', subtitle: 'Pods scheduled on each node, against its capacity',
-                      kind: 'hbar', data: nodeUtil.map((n) => ({ name: n.name, value: n.used })), xKey: 'name',
-                      stats: [
-                        { label: 'Ready', value: `${kpi.nodesReady}/${kpi.nodesTotal}`, tone: kpi.nodesReady === kpi.nodesTotal ? STATUS.ok : STATUS.bad },
-                        { label: 'Total CPU', value: `${k8s.nodes.reduce((s, n) => s + parseCpu(n.capacity?.cpu), 0)} cores` },
-                        { label: 'Total memory', value: `${Math.round(k8s.nodes.reduce((s, n) => s + parseMemGi(n.capacity?.memory), 0))} Gi` },
-                        { label: 'Pod slots', value: num(fleetCap.cap) },
-                      ],
-                      table: { title: 'Nodes', columns: ['Node', 'Status', 'Pods', 'Capacity', 'CPU', 'Memory (Gi)'],
-                        rows: k8s.nodes.map((n) => [n.name, n.status, n.pod_count ?? 0, n.capacity?.pods ?? '—', parseCpu(n.capacity?.cpu), parseMemGi(n.capacity?.memory)]) },
-                    })}>
-                    <HBars items={nodeLoad} color={PALETTE.blue} dk={dk} />
-                  </MetricTile>
-
-                  <MetricTile dk={dk} value={`${kpi.phase.Running}/${kpi.podsTotal}`} caption="Pods running"
-                    axisLeft={<Legend items={[['Running', STATUS.ok], ['Pending', STATUS.warn], ['Other', STATUS.bad]]} dk={dk} />} axisRight=""
-                    onClick={() => setDetail({
-                      title: 'Pod phase by namespace', subtitle: 'Every pod in the cluster, grouped by namespace and phase',
-                      kind: 'hbar', data: byNamespace.slice(0, 12).map((n) => ({ name: n.name, Running: n.running, Pending: n.pending, Failed: n.bad })),
-                      series: ['Running', 'Pending', 'Failed'], xKey: 'name',
-                      stats: [
-                        { label: 'Running', value: num(kpi.phase.Running), tone: STATUS.ok },
-                        { label: 'Pending', value: num(kpi.phase.Pending), tone: STATUS.warn },
-                        { label: 'Failed', value: num(kpi.phase.Failed), tone: STATUS.bad },
-                        { label: 'Total pods', value: num(kpi.podsTotal) },
-                      ],
-                      table: { title: 'Namespaces', columns: ['Namespace', 'Running', 'Pending', 'Other', 'Total'],
-                        rows: byNamespace.map((n) => [n.name, n.running, n.pending, n.bad, n.value]) },
-                    })}>
-                    <StackedMicroBars
-                      data={nsStacks.map((n) => [n.running, n.pending, n.bad])}
-                      labels={nsStacks.map((n) => n.name)}
-                      colors={[STATUS.ok, STATUS.warn, STATUS.bad]} dk={dk} />
-                  </MetricTile>
-
-                  <MetricTile dk={dk} value={`${kpi.workloadsReady}/${kpi.workloadsTotal}`} caption="Workloads at desired replicas"
-                    axisLeft="deployments + statefulsets" axisRight=""
-                    onClick={() => setDetail({
-                      title: 'Workload readiness', subtitle: 'Deployments and statefulsets against their desired replica count',
-                      kind: 'hbar',
-                      data: [...k8s.deployments, ...k8s.statefulsets].slice(0, 14).map((w) => {
-                        const [r, d] = parseReady(w.replicas);
-                        return { name: `${w.namespace}/${w.name}`.slice(0, 30), Ready: r, Missing: Math.max(0, d - r) };
-                      }),
-                      series: ['Ready', 'Missing'], xKey: 'name',
-                      stats: [
-                        { label: 'At desired', value: num(kpi.workloadsReady), tone: STATUS.ok },
-                        { label: 'Degraded', value: num(kpi.workloadsTotal - kpi.workloadsReady), tone: kpi.workloadsReady === kpi.workloadsTotal ? STATUS.idle : STATUS.warn },
-                        { label: 'Deployments', value: num(k8s.deployments.length) },
-                        { label: 'StatefulSets', value: num(k8s.statefulsets.length) },
-                      ],
-                      table: { title: 'Workloads', columns: ['Workload', 'Namespace', 'Replicas', 'Age (days)'],
-                        rows: [...k8s.deployments, ...k8s.statefulsets].map((w) => [w.name, w.namespace, w.replicas, days(w.age)]) },
-                    })}>
-                    <Composition dk={dk} segments={[
-                      { label: 'At desired', value: kpi.workloadsReady, color: STATUS.ok },
-                      { label: 'Degraded', value: kpi.workloadsTotal - kpi.workloadsReady, color: STATUS.warn },
-                    ]} />
-                  </MetricTile>
-
-                  <MetricTile dk={dk} value={num(kpi.restarts)} caption="Container restarts"
-                    axisLeft={`${kpi.notReady} ${plural(kpi.notReady, 'pod')} not fully ready`} axisRight={restartValues.length ? `${restartValues.length} ${plural(restartValues.length, 'pod')} affected` : ''}
-                    onClick={restartTop.length ? () => setDetail({
-                      title: 'Container restarts', subtitle: 'Pods that have restarted, ranked — repeat restarts usually mean a crash loop',
-                      kind: 'hbar', data: restartTop.slice(0, 14).map((p) => ({ name: p.name.slice(0, 30), value: p.value })), xKey: 'name',
-                      stats: [
-                        { label: 'Total restarts', value: num(kpi.restarts), tone: STATUS.warn },
-                        { label: 'Pods affected', value: num(restartTop.length) },
-                        { label: 'Worst pod', value: num(restartTop[0]?.value), tone: STATUS.bad },
-                        { label: 'Not ready', value: num(kpi.notReady) },
-                      ],
-                      table: { title: 'Restarting pods', columns: ['Pod', 'Namespace', 'Restarts'],
-                        rows: restartTop.map((p) => [p.name, p.namespace, p.value]) },
-                    }) : undefined}>
-                    {densityOf(restartValues)
-                      ? <Violin density={densityOf(restartValues)} color={PALETTE.orange} dk={dk} />
-                      : restartValues.length
-                        ? <VBars data={restartValues.slice(0, 24)} color={PALETTE.violet} dk={dk} />
-                        : <div className={`flex items-center justify-center text-[11.5px] ${faint}`} style={{ height: 96 }}>No restarts — fleet stable</div>}
-                  </MetricTile>
-
-                  <MetricTile dk={dk} value={num(byNamespace.length)} caption="Namespaces in use"
-                    axisLeft={byNamespace[0] ? `largest: ${byNamespace[0].name}` : ''} axisRight=""
-                    onClick={() => setDetail({
-                      title: 'Namespaces', subtitle: 'How the cluster’s pods are distributed across namespaces',
-                      kind: 'treemap', data: byNamespace, xKey: 'name',
-                      stats: [
-                        { label: 'Namespaces', value: num(byNamespace.length) },
-                        { label: 'Largest', value: byNamespace[0]?.name || '—' },
-                        { label: 'Its pods', value: num(byNamespace[0]?.value) },
-                        { label: 'Total pods', value: num(kpi.podsTotal) },
-                      ],
-                      table: { title: 'Namespaces', columns: ['Namespace', 'Pods', 'Running', 'Restarts'],
-                        rows: byNamespace.map((n) => [n.name, n.value, n.running, n.restarts]) },
-                    })}>
-                    <TreemapTile data={byNamespace} dk={dk} />
-                  </MetricTile>
-
-                  <MetricTile dk={dk} value={fleetCap.cap ? `${Math.round((fleetCap.used / fleetCap.cap) * 100)}%` : '—'}
-                    caption="Pod slots used across fleet"
-                    axisLeft={`${num(fleetCap.used)} of ${num(fleetCap.cap)} slots`} axisRight=""
-                    onClick={() => setDetail({
-                      title: 'Scheduling headroom', subtitle: 'Pod-slot utilisation per node — how much room is left to schedule',
-                      kind: 'bar', data: nodeUtil.map((n) => ({ name: n.name, value: n.pct })), xKey: 'name',
-                      unit: 'Percent of each node’s pod capacity currently in use.',
-                      stats: [
-                        { label: 'Fleet usage', value: `${fleetCap.cap ? Math.round((fleetCap.used / fleetCap.cap) * 100) : 0}%` },
-                        { label: 'Slots used', value: num(fleetCap.used) },
-                        { label: 'Slots free', value: num(fleetCap.cap - fleetCap.used), tone: STATUS.ok },
-                        { label: 'Busiest node', value: `${Math.max(...nodeUtil.map((n) => n.pct), 0)}%` },
-                      ],
-                      table: { title: 'Nodes', columns: ['Node', 'Used', 'Capacity', 'Used %'],
-                        rows: nodeUtil.map((n) => [n.name, n.used, n.cap, `${n.pct}%`]) },
-                    })}>
-                    <VBars data={nodeUtil.map((n) => n.pct)} labels={nodeUtil.map((n) => n.name)}
-                      color={PALETTE.violet} dk={dk} />
-                  </MetricTile>
-
-                  <MetricTile dk={dk} value={num(images.unique.length)} caption="Distinct container images"
-                    axisLeft={`${num(images.containers)} containers`} axisRight=""
-                    onClick={() => setDetail({
-                      title: 'Container images', subtitle: 'Every image running in the cluster, by how many containers use it',
-                      kind: 'treemap', data: images.unique.slice(0, 16).map((i) => ({ name: i.repo.split('/').pop(), value: i.value })), xKey: 'name',
-                      stats: [
-                        { label: 'Distinct images', value: num(images.unique.length) },
-                        { label: 'Containers', value: num(images.containers) },
-                        { label: 'Registries', value: num(images.registries.length) },
-                        { label: 'Most used', value: num(images.unique[0]?.value) },
-                      ],
-                      table: { title: 'Images', columns: ['Image', 'Tag', 'Registry', 'Containers'],
-                        rows: images.unique.map((i) => [i.repo, i.tag, i.registry, i.value]) },
-                    })}>
-                    <TreemapTile data={images.unique.slice(0, 8).map((i) => ({ name: i.repo.split('/').pop(), value: i.value }))} dk={dk} />
-                  </MetricTile>
-
-                  <MetricTile dk={dk} value={images.containers ? `${Math.round((images.pinned / images.containers) * 100)}%` : '—'}
-                    caption="Images on a pinned tag"
-                    axisLeft={images.floating ? `${images.floating} on a floating tag` : 'all pinned'} axisRight=""
-                    onClick={() => setDetail({
-                      title: 'Image tag hygiene', subtitle: 'A floating tag such as :latest makes a rollout unreproducible — the same tag can resolve to a different image tomorrow',
-                      kind: 'bar', data: [
-                        { name: 'Pinned', value: images.pinned },
-                        { name: 'Floating', value: images.floating },
-                      ], xKey: 'name',
-                      stats: [
-                        { label: 'Pinned', value: num(images.pinned), tone: STATUS.ok },
-                        { label: 'Floating', value: num(images.floating), tone: images.floating ? STATUS.warn : STATUS.idle },
-                        { label: 'Containers', value: num(images.containers) },
-                        { label: 'Pinned share', value: `${images.containers ? Math.round((images.pinned / images.containers) * 100) : 0}%` },
-                      ],
-                      table: { title: 'Containers on a floating tag', columns: ['Pod', 'Namespace', 'Image', 'Tag'],
-                        rows: images.floatingPods.map((f) => [f.pod, f.namespace, f.image, f.tag]) },
-                    })}>
-                    <Composition dk={dk} segments={[
-                      { label: 'Pinned', value: images.pinned, color: STATUS.ok },
-                      { label: 'Floating', value: images.floating, color: STATUS.warn },
-                    ]} />
-                  </MetricTile>
-
-                  <MetricTile dk={dk} value={medianAge != null ? `${medianAge}d` : '—'}
-                    caption="Median pod age"
-                    axisLeft={podAges.length ? `oldest ${Math.max(...podAges)}d` : ''} axisRight={podAges.length ? `newest ${Math.min(...podAges)}d` : ''}
-                    onClick={() => setDetail({
-                      title: 'Workload age', subtitle: 'How long pods have been running — a very old pod has not picked up recent image changes',
-                      kind: 'hbar',
-                      data: [...k8s.pods].sort((a, b) => days(b.age) - days(a.age)).slice(0, 14)
-                        .map((p) => ({ name: p.name.slice(0, 30), value: days(p.age) })),
-                      xKey: 'name', unit: 'Age in days since the pod started.',
-                      stats: [
-                        { label: 'Oldest', value: `${Math.max(...podAges, 0)}d` },
-                        { label: 'Newest', value: `${Math.min(...podAges, 0)}d` },
-                        { label: 'Median', value: `${medianAge ?? 0}d` },
-                        { label: 'Pods', value: num(podAges.length) },
-                      ],
-                      table: { title: 'Pods by age', columns: ['Pod', 'Namespace', 'Node', 'Age (days)'],
-                        rows: [...k8s.pods].sort((a, b) => days(b.age) - days(a.age)).map((p) => [p.name, p.namespace, p.nodeName || '—', days(p.age)]) },
-                    })}>
-                    {densityOf(podAges)
-                      ? <Violin density={densityOf(podAges)} color={PALETTE.orangeSoft} dk={dk} />
-                      : <VBars data={podAges.slice(0, 24)} color={PALETTE.orangeSoft} dk={dk} />}
-                  </MetricTile>
-
-                  <MetricTile dk={dk} value={num(k8s.services.length)} caption="Services exposed"
-                    axisLeft={svcTypes.map((t) => `${t.name} ${t.value}`).join(' · ').slice(0, 40)} axisRight=""
-                    onClick={() => setDetail({
-                      title: 'Services', subtitle: 'Service types in the cluster — NodePort and LoadBalancer reach outside it',
-                      kind: 'bar', data: svcTypes, xKey: 'name',
-                      stats: [
-                        { label: 'Services', value: num(k8s.services.length) },
-                        ...svcTypes.slice(0, 3).map((t) => ({ label: t.name, value: num(t.value) })),
-                      ],
-                      table: { title: 'Services', columns: ['Service', 'Namespace', 'Type', 'Cluster IP', 'Ports'],
-                        rows: k8s.services.map((s) => [s.name, s.namespace, s.type, s.clusterIP || '—', (s.ports || []).join(', ')]) },
-                    })}>
-                    <HBars items={svcTypes} color={PALETTE.teal} dk={dk} />
-                  </MetricTile>
-
-                  <MetricTile dk={dk}
-                    value={hist?.current?.cpuPct != null ? `${hist.current.cpuPct}%` : `${k8s.nodes.reduce((a, n) => a + parseCpu(n.capacity?.cpu), 0)}`}
-                    caption={hist?.current?.cpuPct != null ? 'CPU in use across fleet' : 'CPU cores in fleet'}
-                    axisLeft={hist?.current?.cpuPct != null
-                      ? `${(hist.current.cpuUsedCores || 0).toFixed(1)} of ${hist.current.cpuCapacityCores} cores`
-                      : 'cores per node'}
-                    axisRight={hist ? histWindow.split(' (')[0] : ''}
-                    onClick={hist?.series?.cpuPct?.length ? () => setDetail({
-                      title: 'CPU utilisation', subtitle: `Share of fleet CPU in use · ${histWindow}`,
-                      kind: 'area', data: histChart('cpuPct', 'CPU %'), series: ['CPU %'], xKey: 'label',
-                      unit: 'Percent of allocatable CPU, from container CPU rate over 5m windows.',
-                      stats: [
-                        { label: 'Now', value: `${hist.current.cpuPct}%` },
-                        { label: 'Peak', value: `${Math.max(...hist.series.cpuPct.map((x) => x.v))}%`, tone: STATUS.warn },
-                        { label: 'Cores used', value: (hist.current.cpuUsedCores || 0).toFixed(2) },
-                        { label: 'Cores total', value: num(hist.current.cpuCapacityCores) },
-                      ],
-                      table: histTable('cpuPct', 'CPU %'),
-                    }) : () => setDetail({
-                      title: 'CPU capacity', subtitle: 'Cores each node advertises to the scheduler',
-                      kind: 'bar', data: k8s.nodes.map((n) => ({ name: n.name, value: parseCpu(n.capacity?.cpu) })), xKey: 'name',
-                      unit: 'Capacity only — Prometheus history is unavailable, so live utilisation cannot be shown.',
-                      stats: [
-                        { label: 'Total cores', value: num(k8s.nodes.reduce((a, n) => a + parseCpu(n.capacity?.cpu), 0)) },
-                        { label: 'Nodes', value: num(k8s.nodes.length) },
-                      ],
-                      table: { title: 'Nodes', columns: ['Node', 'Capacity', 'Allocatable'],
-                        rows: k8s.nodes.map((n) => [n.name, parseCpu(n.capacity?.cpu), parseCpu(n.allocatable?.cpu)]) },
-                    })}>
-                    {hist?.series?.cpuPct?.length
-                      ? <GradientLine data={hist.series.cpuPct.map((x) => ({ v: x.v }))} color={PALETTE.indigo} dk={dk} />
-                      : <VBars data={k8s.nodes.map((n) => parseCpu(n.capacity?.cpu))} labels={k8s.nodes.map((n) => n.name)} color={PALETTE.indigo} dk={dk} />}
-                  </MetricTile>
-
-                  <MetricTile dk={dk}
-                    value={hist?.current?.memPct != null ? `${hist.current.memPct}%` : `${Math.round(k8s.nodes.reduce((a, n) => a + parseMemGi(n.capacity?.memory), 0))} Gi`}
-                    caption={hist?.current?.memPct != null ? 'Memory in use across fleet' : 'Memory in fleet'}
-                    axisLeft={hist?.current?.memPct != null
-                      ? `${(hist.current.memUsedBytes / 1073741824).toFixed(1)} of ${Math.round(hist.current.memCapacityBytes / 1073741824)} Gi`
-                      : 'Gi per node'}
-                    axisRight={hist ? histWindow.split(' (')[0] : ''}
-                    onClick={hist?.series?.memPct?.length ? () => setDetail({
-                      title: 'Memory utilisation', subtitle: `Share of fleet memory in use · ${histWindow}`,
-                      kind: 'area', data: histChart('memPct', 'Memory %'), series: ['Memory %'], xKey: 'label',
-                      unit: 'Percent of allocatable memory, from container working-set bytes.',
-                      stats: [
-                        { label: 'Now', value: `${hist.current.memPct}%` },
-                        { label: 'Peak', value: `${Math.max(...hist.series.memPct.map((x) => x.v))}%`, tone: STATUS.warn },
-                        { label: 'In use', value: `${(hist.current.memUsedBytes / 1073741824).toFixed(1)} Gi` },
-                        { label: 'Total', value: `${Math.round(hist.current.memCapacityBytes / 1073741824)} Gi` },
-                      ],
-                      table: histTable('memPct', 'Memory %'),
-                    }) : () => setDetail({
-                      title: 'Memory capacity', subtitle: 'Memory each node advertises to the scheduler',
-                      kind: 'bar', data: k8s.nodes.map((n) => ({ name: n.name, value: parseMemGi(n.capacity?.memory) })), xKey: 'name',
-                      unit: 'Capacity only — Prometheus history is unavailable, so live utilisation cannot be shown.',
-                      stats: [
-                        { label: 'Total', value: `${Math.round(k8s.nodes.reduce((a, n) => a + parseMemGi(n.capacity?.memory), 0))} Gi` },
-                        { label: 'Nodes', value: num(k8s.nodes.length) },
-                      ],
-                      table: { title: 'Nodes', columns: ['Node', 'Capacity (Gi)', 'Allocatable (Gi)'],
-                        rows: k8s.nodes.map((n) => [n.name, parseMemGi(n.capacity?.memory), parseMemGi(n.allocatable?.memory)]) },
-                    })}>
-                    {hist?.series?.memPct?.length
-                      ? <GradientLine data={hist.series.memPct.map((x) => ({ v: x.v }))} color={PALETTE.blue} dk={dk} />
-                      : <VBars data={k8s.nodes.map((n) => parseMemGi(n.capacity?.memory))} labels={k8s.nodes.map((n) => n.name)} color={PALETTE.blue} dk={dk} />}
-                  </MetricTile>
-                </div>
-
-                {/* Nodes list */}
-                <div className="px-6 py-6">
-                  <h3 className={`text-[11px] uppercase tracking-[0.07em] mb-4 ${muted}`}>Nodes · click to inspect</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[680px]">
-                      <thead>
-                        <tr className={`text-[10.5px] uppercase tracking-wide ${faint}`}>
-                          <th className="text-left font-medium pb-2">Node</th>
-                          <th className="text-left font-medium pb-2">Status</th>
-                          <th className="text-left font-medium pb-2">Roles</th>
-                          <th className="text-right font-medium pb-2">Pods</th>
-                          <th className="text-right font-medium pb-2">CPU</th>
-                          <th className="text-right font-medium pb-2">Memory</th>
-                          <th className="pb-2" />
-                        </tr>
-                      </thead>
-                      <tbody className={`divide-y ${divide}`}>
-                        {k8s.nodes.map((n) => {
-                          const ready = n.status === 'Ready';
-                          return (
-                            <tr key={n.name} onClick={() => setDrill({ type: 'node', key: n.name })}
-                              className={`cursor-pointer ${dk ? 'hover:bg-[#161616]' : 'hover:bg-gray-50'}`}>
-                              <td className={`py-2.5 text-[12.5px] ${h2}`}>{n.name}</td>
-                              <td className="py-2.5">
-                                <span className="inline-flex items-center gap-1.5 text-[12px]" style={{ color: ready ? '#16a34a' : '#dc2626' }}>
-                                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: ready ? '#16a34a' : '#dc2626' }} />{n.status}
-                                </span>
-                              </td>
-                              <td className={`py-2.5 text-[12px] ${muted}`}>{(n.roles || []).join(', ')}</td>
-                              <td className={`py-2.5 text-[12px] text-right tabular-nums ${muted}`}>{n.pod_count ?? '—'}{n.capacity?.pods ? ` / ${n.capacity.pods}` : ''}</td>
-                              <td className={`py-2.5 text-[12px] text-right tabular-nums ${muted}`}>{parseCpu(n.capacity?.cpu) || '—'}</td>
-                              <td className={`py-2.5 text-[12px] text-right tabular-nums ${muted}`}>{parseMemGi(n.capacity?.memory) ? `${parseMemGi(n.capacity.memory)} Gi` : '—'}</td>
-                              <td className="py-2.5 text-right"><ChevronRight size={14} className={faint} /></td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Drill-down */}
-                {drill && drillData && (
-                  <div className={`${card} p-5 mt-2`}>
-                    <div className="flex items-center justify-between mb-5">
-                      <div className="flex items-center gap-2.5">
-                        <button onClick={() => setDrill(null)} className={`p-1.5 rounded-md ${muted} ${dk ? 'hover:bg-[#1e1e1e]' : 'hover:bg-gray-100'}`}><ArrowLeft size={15} /></button>
-                        <span className="flex items-center justify-center w-7 h-7 rounded-lg" style={{ background: `${PALETTE.indigo}1a`, color: PALETTE.indigo }}>
-                          {drill.type === 'node' ? <Server size={14} /> : <Layers size={14} />}
-                        </span>
-                        <div>
-                          <h3 className={`text-[14px] font-semibold ${h1}`}>{drill.key}</h3>
-                          <p className={`text-[11.5px] ${faint}`}>{drill.type === 'node' ? 'Node' : 'Namespace'} · {drillData.pods.length} pods · {drillData.restarts} restarts</p>
-                        </div>
-                      </div>
-                      {drill.type === 'node' && drillData.node && (
-                        <div className={`text-[11.5px] text-right ${muted}`}>
-                          <div>{drillData.node.internal_ip}</div>
-                          <div className={faint}>{drillData.node.node_info?.os_image || ''}</div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      <div>
-                        <h4 className={`text-[10.5px] uppercase tracking-[0.07em] mb-3 ${muted}`}>Pods by phase</h4>
-                        <HBars items={drillData.phaseItems} color={PALETTE.teal} height={100} dk={dk} />
-                        <div className={`mt-2 space-y-1 text-[11.5px] ${muted}`}>
-                          {drillData.phaseItems.map((p) => (
-                            <div key={p.name} className="flex justify-between"><span>{p.name}</span><span className="tabular-nums">{p.value}</span></div>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className={`text-[10.5px] uppercase tracking-[0.07em] mb-3 ${muted}`}>
-                          {drill.type === 'namespace' ? 'Workloads' : 'Capacity'}
-                        </h4>
-                        {drill.type === 'namespace' ? (
-                          drillData.workloads.length === 0
-                            ? <p className={`text-[12px] ${faint}`}>No deployments or statefulsets</p>
-                            : <div className="space-y-1.5 max-h-[150px] overflow-y-auto no-scrollbar">
-                                {drillData.workloads.map((w, i) => {
-                                  const [r, d] = parseReady(w.replicas);
-                                  return (
-                                    <div key={i} className="flex justify-between gap-2">
-                                      <span className={`text-[12px] truncate ${muted}`}>{w.name}</span>
-                                      <span className="text-[11.5px] tabular-nums shrink-0" style={{ color: (d === 0 || r >= d) ? '#16a34a' : '#d97706' }}>{w.replicas}</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                        ) : (
-                          <div className={`space-y-1.5 text-[12px] ${muted}`}>
-                            <div className="flex justify-between"><span>CPU</span><span className="tabular-nums">{parseCpu(drillData.node?.capacity?.cpu) || '—'} cores</span></div>
-                            <div className="flex justify-between"><span>Memory</span><span className="tabular-nums">{parseMemGi(drillData.node?.capacity?.memory) || '—'} Gi</span></div>
-                            <div className="flex justify-between"><span>Pod capacity</span><span className="tabular-nums">{drillData.node?.capacity?.pods || '—'}</span></div>
-                            <div className="flex justify-between"><span>Scheduled</span><span className="tabular-nums">{drillData.pods.length}</span></div>
-                            <div className="flex justify-between"><span>Kernel</span><span className="tabular-nums text-[11px]">{drillData.node?.node_info?.kernel_version || '—'}</span></div>
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <h4 className={`text-[10.5px] uppercase tracking-[0.07em] mb-3 ${muted}`}>Pods ({drillData.pods.length})</h4>
-                        <div className="space-y-1 max-h-[150px] overflow-y-auto no-scrollbar">
-                          {drillData.pods.slice(0, 40).map((p, i) => (
-                            <button key={i} onClick={() => navigate(`/dashboard/apps/${clusterId}/pod/${p.namespace}/${p.name}`)}
-                              className="w-full flex items-center justify-between gap-2 text-left">
-                              <span className={`text-[12px] truncate ${muted}`}>{p.name}</span>
-                              <span className="text-[11px] shrink-0" style={{ color: p.status === 'Running' ? '#16a34a' : p.status === 'Pending' ? '#d97706' : '#dc2626' }}>{p.status}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
+              <ExecutiveDashboard fleet={fleet} dk={dk} onGoToTab={setTab} />
             )}
-          </>
+          </div>
         )}
 
         {/* Saved widgets */}
-        {customWidgets.length > 0 && (
+        {tab === 'fleet' && customWidgets.length > 0 && (
           <div className="pt-8">
             <h2 className={`text-[11px] uppercase tracking-[0.07em] mb-4 ${muted}`}>Saved widgets</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

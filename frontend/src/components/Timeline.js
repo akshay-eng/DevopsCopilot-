@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { backendApi } from '../services/api';
 import { fetchAlertHistory } from '../api/alertsApi';
@@ -11,6 +12,7 @@ import TimelineChart from './TimelineChart';
 import { Filter, Plus, X, ChevronDown, ChevronsUpDown, Search as SearchIcon, SlidersHorizontal } from 'lucide-react';
 
 const Timeline = () => {
+  const navigate = useNavigate();
   const { theme } = useTheme();
   const [selectedTab, setSelectedTab] = useState('grouped');
   const [selectedFilters, setSelectedFilters] = useState(['High', 'Medium', 'Low', 'Info', 'Resolved', 'Network']);
@@ -133,24 +135,56 @@ const Timeline = () => {
   const [resolvingAlertKey, setResolvingAlertKey] = useState(null);
   const toggleEnrichSection = (s) => setEnrichSections(prev => ({ ...prev, [s]: !prev[s] }));
 
-  // Manually resolve all firing occurrences of an alert. The backend emits
-  // 'alert-resolved' over the user's own socket room, which useTimelineAlerts already
-  // listens for (resolveAlertByName) — so no separate local dispatch is needed here.
+  // Agent-driven resolve: the agent investigates on the live cluster, fixes what
+  // it safely can (asking for approval in Agent Threads before anything
+  // mutating), then writes the summary, updates the runbook and closes the
+  // ServiceNow incident. The backend emits 'alert-resolved' over the user's own
+  // socket room, which useTimelineAlerts already listens for.
+  //
+  // This can take minutes and may pause on a human, so the button reports what
+  // stage it is at rather than pretending to be instant.
+  const [resolution, setResolution] = useState(null);
+  const [resolveError, setResolveError] = useState(null);
+
   const resolveAlert = async (alert) => {
     const key = `${alert.clusterId}-${alert.alertname}`;
     setResolvingAlertKey(key);
+    setResolveError(null);
+    setResolution(null);
     try {
-      await backendApi.post('/api/alerts/resolve', {
+      const r = await backendApi.post('/api/alerts/agent-resolve', {
+        alertId: alert._id,
         clusterId: alert.clusterId,
         alertname: alert.alertname,
-        namespace: alert.namespace
-      });
+        namespace: alert.namespace,
+      }, { timeout: 960000 });
+
+      if (r?.success) setResolution(r.resolution);
+      else setResolveError(r?.error || 'The agent could not resolve this alert.');
     } catch (err) {
+      setResolveError(err?.response?.data?.error || err.message || 'Resolve failed.');
       console.error('Failed to resolve alert:', err);
     } finally {
       setResolvingAlertKey(null);
     }
   };
+
+  // Show a resolution the agent produced earlier, so reopening an alert does not
+  // look like nothing ever happened.
+  useEffect(() => {
+    if (!selectedStreamAlert?.alertname) { setResolution(null); return; }
+    let cancelled = false;
+    backendApi
+      .get('/api/alerts/resolution', {
+        params: {
+          alertname: selectedStreamAlert.alertname,
+          ...(selectedStreamAlert.namespace ? { namespace: selectedStreamAlert.namespace } : {}),
+        },
+      })
+      .then((r) => { if (!cancelled && r?.resolution) setResolution(r.resolution); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [selectedStreamAlert?.alertname, selectedStreamAlert?.namespace]);
 
   // Correlated incident data for the selected alert
   const [correlatedIncident, setCorrelatedIncident] = useState(null);
@@ -1042,7 +1076,12 @@ const Timeline = () => {
                   disabled={resolvingAlertKey === `${a.clusterId}-${a.alertname}`}
                   className={`px-3 py-1 text-xs rounded flex items-center gap-1 ${dk ? 'bg-green-700 hover:bg-green-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
-                  <span>✓</span><span>{resolvingAlertKey === `${a.clusterId}-${a.alertname}` ? 'Resolving…' : 'Resolve'}</span>
+                  <span>✓</span>
+                  <span>
+                    {resolvingAlertKey === `${a.clusterId}-${a.alertname}`
+                      ? 'Agent working — approve in Agent Threads…'
+                      : 'Resolve with agent'}
+                  </span>
                 </button>
               )}
               <button className={`px-3 py-1 text-xs rounded flex items-center gap-1 ${dk ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}>
@@ -1958,6 +1997,73 @@ const Timeline = () => {
                             ))}
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {/* What the agent did about it — above the analysis, because
+                        "it is fixed" is the first thing anyone needs to know. */}
+                    {(resolution || resolveError) && (
+                      <div className={`border rounded-lg overflow-hidden mb-3 ${dk ? 'border-slate-700' : 'border-gray-200'}`}>
+                        <div className={`px-4 py-2.5 flex items-center justify-between ${dk ? 'bg-slate-800/60' : 'bg-gray-50'}`}>
+                          <span className={`text-sm font-semibold ${dk ? 'text-slate-200' : 'text-gray-800'}`}>Agent resolution</span>
+                          {resolution?.outcome && (
+                            <span className={`text-[10px] px-2 py-0.5 rounded uppercase tracking-wide ${
+                              resolution.outcome === 'remediated' ? 'bg-green-500/20 text-green-400'
+                              : resolution.outcome === 'awaiting-human' ? 'bg-amber-500/20 text-amber-400'
+                              : resolution.outcome === 'failed' ? 'bg-red-500/20 text-red-400'
+                              : 'bg-slate-500/20 text-slate-400'}`}>
+                              {resolution.outcome.replace(/-/g, ' ')}
+                            </span>
+                          )}
+                        </div>
+                        <div className={`border-t p-4 ${dk ? 'border-slate-700' : 'border-gray-200'}`}>
+                          {resolveError && (
+                            <div className="text-xs text-red-400 mb-2">{resolveError}</div>
+                          )}
+                          {resolution?.summary && (
+                            <div className={`text-sm whitespace-pre-wrap leading-relaxed ${dk ? 'text-slate-300' : 'text-gray-700'}`}>
+                              {resolution.summary}
+                            </div>
+                          )}
+                          {resolution?.actions?.filter(x => x.status === 'applied').length > 0 && (
+                            <div className="mt-3">
+                              <div className={`text-xs mb-1 ${dk ? 'text-slate-500' : 'text-gray-500'}`}>Applied to the cluster</div>
+                              {resolution.actions.filter(x => x.status === 'applied').map((x, i) => (
+                                <div key={i} className={`text-xs font-mono ${dk ? 'text-green-400' : 'text-green-700'}`}>
+                                  {x.action}{x.detail ? ` — ${x.detail}` : ''}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {resolution?.actions?.filter(x => x.status === 'refused').length > 0 && (
+                            <div className="mt-3">
+                              <div className={`text-xs mb-1 ${dk ? 'text-slate-500' : 'text-gray-500'}`}>Not approved</div>
+                              {resolution.actions.filter(x => x.status === 'refused').map((x, i) => (
+                                <div key={i} className={`text-xs font-mono ${dk ? 'text-amber-400' : 'text-amber-700'}`}>
+                                  {x.action}{x.detail ? ` — ${x.detail}` : ''}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {resolution?.followUps?.length > 0 && (
+                            <div className={`mt-3 pt-2 border-t text-xs ${dk ? 'border-slate-700 text-slate-400' : 'border-gray-200 text-gray-600'}`}>
+                              {resolution.followUps.map((f, i) => <div key={i}>• {f}</div>)}
+                            </div>
+                          )}
+                          {resolution?.sopPath && (
+                            <div className={`mt-2 text-xs ${dk ? 'text-slate-500' : 'text-gray-500'}`}>
+                              Runbook: <span className="font-mono">{resolution.sopPath}</span> (SOPs &amp; Reports)
+                            </div>
+                          )}
+                          {resolution?.threadId && (
+                            <button
+                              onClick={() => navigate('/dashboard/agent-threads')}
+                              className={`mt-3 text-xs underline ${dk ? 'text-violet-400' : 'text-blue-600'}`}
+                            >
+                              See the full run in Agent Threads
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
 
