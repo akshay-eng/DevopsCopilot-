@@ -18,6 +18,12 @@ const k8s = require('@kubernetes/client-node');
  * directly. Accept either so a future upgrade does not silently empty every
  * enrichment field again.
  */
+/**
+ * Prometheus jobs that SCRAPE other things. When an alert comes from one of
+ * these, its `pod`/`container` labels describe the exporter, not the subject.
+ */
+const EXPORTER_JOBS = /kube-state-metrics|node-exporter|kubelet|cadvisor|prometheus|blackbox|pushgateway/i;
+
 const unwrap = (res) => (res && res.body !== undefined ? res.body : res) || {};
 const axios = require('axios');
 
@@ -168,18 +174,50 @@ class AlertEnricher {
   // Resource Target Detection
   // ===========================
 
+  /**
+   * Which object is this alert actually ABOUT?
+   *
+   * ⚠ The `pod` label is frequently the EXPORTER that scraped the metric, not
+   * the thing that is broken. A KubePVCStuckPending alert carries
+   * `persistentvolumeclaim=data-redis-0` (the subject) alongside
+   * `pod=prometheus-kube-state-metrics-...` and `job=kube-state-metrics` (the
+   * scrape target). Checking `pod` first therefore enriched the exporter —
+   * usually in a different namespace, so every lookup 404'd and the alert
+   * detail tabs came back empty.
+   *
+   * So: the most specific subject label wins, and a `pod` label is only trusted
+   * when it did not come from a known exporter job.
+   */
   determineResourceTarget(rawAlert, enrichedBase) {
-    const labels = rawAlert.labels || {};
-    const pod = labels.pod || enrichedBase.labels?.pod;
-    const namespace = labels.namespace || enrichedBase.labels?.namespace || 'default';
-    const node = labels.node || enrichedBase.labels?.node;
+    const labels = { ...(enrichedBase.labels || {}), ...(rawAlert.labels || {}) };
+    const namespace = labels.namespace || 'default';
+
     const pvc = labels.persistentvolumeclaim;
     const deployment = labels.deployment;
+    const statefulset = labels.statefulset;
+    const daemonset = labels.daemonset;
+    const node = labels.node || labels.instance_node;
+    const pod = labels.pod;
 
-    if (pod) return { type: 'pod', name: pod, namespace };
-    if (node) return { type: 'node', name: node, namespace: null };
+    // Specific subject labels first — these name the failing object directly.
     if (pvc) return { type: 'pvc', name: pvc, namespace };
     if (deployment) return { type: 'deployment', name: deployment, namespace };
+    if (statefulset) return { type: 'statefulset', name: statefulset, namespace };
+    if (daemonset) return { type: 'daemonset', name: daemonset, namespace };
+
+    // A `pod` label is the SUBJECT for pod-level alerts (KubePodNotReady carries
+    // pod=redis-0 even though the job is kube-state-metrics), but it is the
+    // SCRAPER when the alert is about something else. The reliable test is not
+    // the job name — it is whether the pod is itself that job's exporter, i.e.
+    // its name contains the job/service name.
+    const isScraper = pod && EXPORTER_JOBS.test(pod)
+      && [labels.job, labels.service].some((v) => v && pod.includes(v));
+
+    if (pod && !isScraper) return { type: 'pod', name: pod, namespace };
+    if (node) return { type: 'node', name: node, namespace: null };
+
+    // An exporter-sourced alert with nothing but a pod label still tells us the
+    // namespace, which is enough for events and configuration history.
     return { type: 'unknown', name: null, namespace };
   }
 
